@@ -88,10 +88,12 @@ function main() {
   twgl.setAttributePrefix("a_");
 
   var sphereBufferInfo = flattenedPrimitives.createSphereBufferInfo(gl, 10, 48, 24); 
-
+	var sphereBufferInfo2 = flattenedPrimitives.createSphereBufferInfo(gl, 5, 24, 12); 
+	
   // setup GLSL program
   var programInfo = twgl.createProgramInfo(gl, [vs, fs]);
   var sphereVAO = twgl.createVAOFromBufferInfo(gl, programInfo, sphereBufferInfo);
+  var sphereVAO2 = twgl.createVAOFromBufferInfo(gl, programInfo, sphereBufferInfo2);
 
   function degToRad(d) {
     return d * Math.PI / 180;
@@ -116,24 +118,82 @@ function main() {
     bufferInfo: sphereBufferInfo,
     vertexArray: sphereVAO,
   };
+  
+  var sphereNode2 = new Node();
+  sphereNode2.localMatrix = m4.translation(25, 0, 0);
+  sphereNode2.drawInfo = {
+    uniforms: {
+      u_colorOffset: [0.2, 0.3, 1, 1], 
+      u_colorMult:   [0.3, 0.1, 0.9, 1],
+    },
+    programInfo: programInfo,
+    bufferInfo: sphereBufferInfo2,
+    vertexArray: sphereVAO2,
+  };
+  
 
   // connect the celetial objects
   sphereNode.setParent(mainNode);
-
+  sphereNode2.setParent(sphereNode);
+	
   var objects = [
-    sphereNode
+    sphereNode,
+    sphereNode2
   ];
 
   var objectsToDraw = [
-    sphereNode.drawInfo
+    sphereNode.drawInfo,
+    sphereNode2.drawInfo
   ];
 
-  requestAnimationFrame(drawScene);
+	
+	var pointA = [50, 50, 0];
+	var pointB = [100, 100, 0];	
+	var pointC1 = [100, 0, 50];
+	var pointC2 = [50, 0, 100];
+	var cameraMovementSpeed = 1;
 
+	//(1-t)^(3)A + 3t(1-t)^(2)c1 + 3t^(2)(1-t)c2+ t^(3)B
+
+	function pointSum(A, B) {
+		return [A[0] + B[0], A[1] + B[1], A[2] + B[2]];
+	}
+	
+	function pointMultiplyScalar(A, s) {
+		return [A[0] * s, A[1] * s, A[2] * s];
+	}
+	
+	function bezierCurve(A, B, c1, c2, t) {
+		var firstTerm = pointMultiplyScalar(A, (1 - t) ** 3);
+		var secondTerm = pointMultiplyScalar(c1, 3 * t * (1 - t) ** 2);
+		var thirdTerm = pointMultiplyScalar(c2, (3 * t ** 2) * (1-t));
+		var fourthTerm = pointMultiplyScalar(B, t ** 3);
+		return pointSum(firstTerm, pointSum(secondTerm, pointSum(thirdTerm, fourthTerm)));
+	}
+	
+  requestAnimationFrame(drawScene);
+	var then = 0;
+	var timeSum = 0;
+	var animationDuration = 4;
+	
   // Draw the scene.
   function drawScene(time) {
     time *= 0.001;
 
+	  // Subtract the previous time from the current time
+  	var deltaTime = time - then;
+  	timeSum += deltaTime;
+  	if (timeSum > animationDuration) {
+  		timeSum = 0;
+  	}
+  	var t = timeSum / animationDuration;
+  	if (t > animationDuration) t = animationDuration;
+  	var cameraPosition = bezierCurve(pointA, pointB, pointC1, pointC2, t);
+  	sphereNode.localMatrix = m4.multiply(m4.yRotation(0.01), sphereNode.localMatrix);
+  	
+  	// Remember the current time for the next frame.
+  	then = time;
+  	
     twgl.resizeCanvasToDisplaySize(gl.canvas);
 
     // Tell WebGL how to convert from clip space to pixels
@@ -152,9 +212,9 @@ function main() {
         m4.perspective(fieldOfViewRadians, aspect, 1, 2000);
 
     // Compute the camera's matrix using look at.
-    var cameraPosition = [50, 0, 50];
+    // var cameraPosition = [50, 0, 50];
     var target = [0, 0, 0];
-    var up = [0, 0, 1];
+    var up = [0, 1, 0];
     var cameraMatrix = m4.lookAt(cameraPosition, target, up);
 
     // Make a view matrix from the camera matrix.
@@ -163,7 +223,7 @@ function main() {
     var viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
 
     // Update all world matrices in the scene graph
-    //mainNode.updateWorldMatrix();
+    mainNode.updateWorldMatrix();
 
     // Compute all the matrices for rendering
     objects.forEach(function(object) {
