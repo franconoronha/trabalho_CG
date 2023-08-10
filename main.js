@@ -72,8 +72,6 @@ Node.prototype.updateWorldMatrix = function(matrix) {
   });
 };
 
-
-
 function main() {
   // Get A WebGL context
   /** @type {HTMLCanvasElement} */
@@ -105,10 +103,8 @@ function main() {
   var objects = [];
 
   // Let's make all the nodes
-  var mainNode = new Node();
-
   var sphereNode = new Node();
-  sphereNode.localMatrix = m4.translation(0, 0, 0);
+  sphereNode.localMatrix = m4.translation(200, 200, 0);
   sphereNode.drawInfo = {
     uniforms: {
       u_colorOffset: [0.8, 0.1, 0.1, 1], 
@@ -119,8 +115,14 @@ function main() {
     vertexArray: sphereVAO,
   };
   
+  var mainNode = new Node();
+  mainNode.localMatrix = m4.translation(0, 0, 0);
+
+  var orbitNode = new Node();
+  orbitNode.localMatrix = m4.translation(25, 0, 0);
+
   var sphereNode2 = new Node();
-  sphereNode2.localMatrix = m4.translation(25, 0, 0);
+  sphereNode2.localMatrix = m4.translation(0, 0, 0);
   sphereNode2.drawInfo = {
     uniforms: {
       u_colorOffset: [0.2, 0.3, 1, 1], 
@@ -134,7 +136,8 @@ function main() {
 
   // connect the celetial objects
   sphereNode.setParent(mainNode);
-  sphereNode2.setParent(sphereNode);
+  orbitNode.setParent(sphereNode);
+  sphereNode2.setParent(orbitNode);
 	
   var objects = [
     sphereNode,
@@ -147,30 +150,57 @@ function main() {
   ];
 
 	
-	var pointA = [50, 50, 0];
+	var pointA = [0, 0, 0];
 	var pointB = [100, 100, 0];	
-	var pointC1 = [100, 0, 50];
-	var pointC2 = [50, 0, 100];
-	var cameraMovementSpeed = 1;
+  //var pointC = [100, 50, 0];
+  /* var pointC1 = [50, 50, 0];
+	var pointC2 = [50, 50, 0]; */
+  var pointC1 = [75, 25, 0];
+	var pointC2 = [25, 75, 0];
+  //var pointC3 = [];
+	//var cameraMovementSpeed = 1;
 
-	//(1-t)^(3)A + 3t(1-t)^(2)c1 + 3t^(2)(1-t)c2+ t^(3)B
+	
 
 	function pointSum(A, B) {
 		return [A[0] + B[0], A[1] + B[1], A[2] + B[2]];
 	}
 	
+  function sumPointList(pointList) {
+    var sum = [0, 0, 0];
+    for (let i = 0; i < pointList.length; i++) {
+      sum[0] += pointList[i][0];
+      sum[1] += pointList[i][1];
+      sum[2] += pointList[i][2];
+    }
+    return sum;
+  }
+
 	function pointMultiplyScalar(A, s) {
 		return [A[0] * s, A[1] * s, A[2] * s];
 	}
-	
+
+	//(1-t)^(3)A + 3t(1-t)^(2)c1 + 3t^(2)(1-t)c2 + t^(3)B
+  //(1-t)^(3)A + 3t(1-t)^(2)c1 + 3t^(2)(1-t)c2 + t^(3)B
 	function bezierCurve(A, B, c1, c2, t) {
 		var firstTerm = pointMultiplyScalar(A, (1 - t) ** 3);
-		var secondTerm = pointMultiplyScalar(c1, 3 * t * (1 - t) ** 2);
-		var thirdTerm = pointMultiplyScalar(c2, (3 * t ** 2) * (1-t));
+		var secondTerm = pointMultiplyScalar(c1, 3 * ((1 - t) ** 2) * t);
+		var thirdTerm = pointMultiplyScalar(c2, 3 * (1 - t) * (t ** 2));
 		var fourthTerm = pointMultiplyScalar(B, t ** 3);
 		return pointSum(firstTerm, pointSum(secondTerm, pointSum(thirdTerm, fourthTerm)));
 	}
-	
+
+  // tan = -3(1-t)^(2)A + 3(1-t)^(2)c1 - 6t(1-t)c1 - 3t^(2)c2 + 6t(1-t)c2 + 3t^(2)B
+  function calcTangent(A, B, c1, c2, t) {
+    var t1 = pointMultiplyScalar(A, -3 * ((1 - t) ** 2));
+    var t2 = pointMultiplyScalar(c1, 3 * ((1 - t) ** 2));
+    var t3 = pointMultiplyScalar(c1, -6 * t * (1 - t));
+    var t4 = pointMultiplyScalar(c2, -3 * t ** 2);
+    var t5 = pointMultiplyScalar(c2, 6 * t * (1 - t));
+    var t6 = pointMultiplyScalar(B, 3 * t ** 2);
+    return sumPointList([t1, t2, t3, t4, t5, t6]);
+  }
+
   requestAnimationFrame(drawScene);
 	var then = 0;
 	var timeSum = 0;
@@ -189,8 +219,10 @@ function main() {
   	var t = timeSum / animationDuration;
   	if (t > animationDuration) t = animationDuration;
   	var cameraPosition = bezierCurve(pointA, pointB, pointC1, pointC2, t);
-  	sphereNode.localMatrix = m4.multiply(m4.yRotation(0.01), sphereNode.localMatrix);
-  	
+    var target = bezierCurve(pointA, pointB, pointC1, pointC2, t + 0.01);
+    //sphereNode.localMatrix = m4.multiply(m4.yRotation(0.01), sphereNode.localMatrix);
+  	orbitNode.localMatrix = m4.multiply(m4.yRotation(0.05), orbitNode.localMatrix);
+  	sphereNode2.localMatrix = m4.multiply(m4.yRotation(0.01), sphereNode2.localMatrix);
   	// Remember the current time for the next frame.
   	then = time;
   	
@@ -212,11 +244,12 @@ function main() {
         m4.perspective(fieldOfViewRadians, aspect, 1, 2000);
 
     // Compute the camera's matrix using look at.
-    // var cameraPosition = [50, 0, 50];
-    var target = [0, 0, 0];
-    var up = [0, 1, 0];
+    //var cameraPosition = [0, 0, 0];
+    //var target = calcTangent(pointA, pointB, pointC1, pointC2, t)
+    var up = [0, 0, 1];
     var cameraMatrix = m4.lookAt(cameraPosition, target, up);
-
+    //console.log(cameraPosition);
+    //console.log(t, cameraPosition, target);
     // Make a view matrix from the camera matrix.
     var viewMatrix = m4.inverse(cameraMatrix);
 
