@@ -72,7 +72,7 @@ Node.prototype.updateWorldMatrix = function(matrix) {
   });
 };
 
-function main() {
+async function main() {
   // Get A WebGL context
   /** @type {HTMLCanvasElement} */
   var canvas = document.querySelector("#canvas");
@@ -80,6 +80,9 @@ function main() {
   if (!gl) {
     return;
   }
+
+  const response = await fetch('https://webgl2fundamentals.org/webgl/resources/models/book-vertex-chameleon-study/book.obj');  
+  const text = await response.text();
 
   // Tell the twgl to match position with a_position, n
   // normal with a_normal etc..
@@ -246,7 +249,7 @@ function main() {
     // Compute the camera's matrix using look at.
     //var cameraPosition = [0, 0, 0];
     //var target = calcTangent(pointA, pointB, pointC1, pointC2, t)
-    var up = [0, 0, 1];
+    var up = [0, 1, 0];
     var cameraMatrix = m4.lookAt(cameraPosition, target, up);
     //console.log(cameraPosition);
     //console.log(t, cameraPosition, target);
