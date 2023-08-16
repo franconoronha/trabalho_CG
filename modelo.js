@@ -481,7 +481,10 @@ async function main() {
       vao,
     };
   });
-
+  console.log("--------------------");
+  console.log(parts);
+  //console.log(geometries);
+  console.log("--------------------");
   function getExtents(positions) {
     const min = positions.slice(0, 3);
     const max = positions.slice(0, 3);

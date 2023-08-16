@@ -107,7 +107,7 @@ async function main() {
 
   // Let's make all the nodes
   var sphereNode = new Node();
-  sphereNode.localMatrix = m4.translation(200, 200, 0);
+  sphereNode.localMatrix = m4.translation(0, 0, 0);
   sphereNode.drawInfo = {
     uniforms: {
       u_colorOffset: [0.8, 0.1, 0.1, 1], 
@@ -155,11 +155,13 @@ async function main() {
 	
 	var pointA = [0, 0, 0];
 	var pointB = [100, 100, 0];	
-  //var pointC = [100, 50, 0];
-  /* var pointC1 = [50, 50, 0];
-	var pointC2 = [50, 50, 0]; */
-  var pointC1 = [75, 25, 0];
-	var pointC2 = [25, 75, 0];
+  var pointC = [200, 200, 0];
+  var pointC1 = [0, 0, 0];
+	var pointC2 = [40, 100, 0];
+  var pointC3 = [150, 100, 0];
+  var pointC4 = [150, 250, 0];
+  
+
   //var pointC3 = [];
 	//var cameraMovementSpeed = 1;
 
@@ -183,18 +185,17 @@ async function main() {
 		return [A[0] * s, A[1] * s, A[2] * s];
 	}
 
-	//(1-t)^(3)A + 3t(1-t)^(2)c1 + 3t^(2)(1-t)c2 + t^(3)B
   //(1-t)^(3)A + 3t(1-t)^(2)c1 + 3t^(2)(1-t)c2 + t^(3)B
-	function bezierCurve(A, B, c1, c2, t) {
-		var firstTerm = pointMultiplyScalar(A, (1 - t) ** 3);
-		var secondTerm = pointMultiplyScalar(c1, 3 * ((1 - t) ** 2) * t);
-		var thirdTerm = pointMultiplyScalar(c2, 3 * (1 - t) * (t ** 2));
-		var fourthTerm = pointMultiplyScalar(B, t ** 3);
+	function bezierCurve(A, B, c1, c2, t, i) {
+		var firstTerm = pointMultiplyScalar(A, (1 - t + i) ** 3);
+		var secondTerm = pointMultiplyScalar(c1, 3 * ((1 - t + i) ** 2) * (t - i));
+		var thirdTerm = pointMultiplyScalar(c2, 3 * (1 - t + i) * ((t - i) ** 2));
+		var fourthTerm = pointMultiplyScalar(B, (t - i) ** 3);
 		return pointSum(firstTerm, pointSum(secondTerm, pointSum(thirdTerm, fourthTerm)));
 	}
 
   // tan = -3(1-t)^(2)A + 3(1-t)^(2)c1 - 6t(1-t)c1 - 3t^(2)c2 + 6t(1-t)c2 + 3t^(2)B
-  function calcTangent(A, B, c1, c2, t) {
+  /* function calcTangent(A, B, c1, c2, t) {
     var t1 = pointMultiplyScalar(A, -3 * ((1 - t) ** 2));
     var t2 = pointMultiplyScalar(c1, 3 * ((1 - t) ** 2));
     var t3 = pointMultiplyScalar(c1, -6 * t * (1 - t));
@@ -202,12 +203,12 @@ async function main() {
     var t5 = pointMultiplyScalar(c2, 6 * t * (1 - t));
     var t6 = pointMultiplyScalar(B, 3 * t ** 2);
     return sumPointList([t1, t2, t3, t4, t5, t6]);
-  }
+  } */
 
   requestAnimationFrame(drawScene);
 	var then = 0;
 	var timeSum = 0;
-	var animationDuration = 4;
+	var animationDuration = 6;
 	
   // Draw the scene.
   function drawScene(time) {
@@ -219,13 +220,19 @@ async function main() {
   	if (timeSum > animationDuration) {
   		timeSum = 0;
   	}
-  	var t = timeSum / animationDuration;
-  	if (t > animationDuration) t = animationDuration;
-  	var cameraPosition = bezierCurve(pointA, pointB, pointC1, pointC2, t);
-    var target = bezierCurve(pointA, pointB, pointC1, pointC2, t + 0.01);
+  	var t = (timeSum / animationDuration) * 2;
+  	if (t > 2) t = 2;
+  	//var cameraPosition = bezierCurve(pointA, pointB, pointC1, pointC2, t);
+    //var target = bezierCurve(pointA, pointB, pointC1, pointC2, t + 0.01);
+    if(t < 1) {
+      sphereNode.localMatrix = m4.translation(...bezierCurve(pointA, pointB, pointC1, pointC2, t, 0));
+    } else {
+      sphereNode.localMatrix = m4.translation(...bezierCurve(pointB, pointC, pointC3, pointC4, t, 1));
+    }
+    
     //sphereNode.localMatrix = m4.multiply(m4.yRotation(0.01), sphereNode.localMatrix);
-  	orbitNode.localMatrix = m4.multiply(m4.yRotation(0.05), orbitNode.localMatrix);
-  	sphereNode2.localMatrix = m4.multiply(m4.yRotation(0.01), sphereNode2.localMatrix);
+  	//orbitNode.localMatrix = m4.multiply(m4.yRotation(0.05), orbitNode.localMatrix);
+  	//sphereNode2.localMatrix = m4.multiply(m4.yRotation(0.01), sphereNode2.localMatrix);
   	// Remember the current time for the next frame.
   	then = time;
   	
@@ -247,8 +254,10 @@ async function main() {
         m4.perspective(fieldOfViewRadians, aspect, 1, 2000);
 
     // Compute the camera's matrix using look at.
-    //var cameraPosition = [0, 0, 0];
+    var cameraPosition = [100, 100, 200];
     //var target = calcTangent(pointA, pointB, pointC1, pointC2, t)
+    //var target = [50, 50, 0];
+    var target = [50, 50, 0];
     var up = [0, 1, 0];
     var cameraMatrix = m4.lookAt(cameraPosition, target, up);
     //console.log(cameraPosition);
@@ -260,7 +269,6 @@ async function main() {
 
     // Update all world matrices in the scene graph
     mainNode.updateWorldMatrix();
-
     // Compute all the matrices for rendering
     objects.forEach(function(object) {
         object.drawInfo.uniforms.u_matrix = m4.multiply(viewProjectionMatrix, object.worldMatrix);
