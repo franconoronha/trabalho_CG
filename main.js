@@ -482,8 +482,8 @@ async function main() {
   });
   console.log("--------------------");
   console.log(parts);
-  //console.log(geometries);
   console.log("--------------------");
+
   /* function getExtents(positions) {
     const min = positions.slice(0, 3);
     const max = positions.slice(0, 3);
@@ -567,7 +567,7 @@ async function main() {
 		return [A[0] * s, A[1] * s, A[2] * s];
 	}
 
-  //(1-t)^(3)A + 3t(1-t)^(2)c1 + 3t^(2)(1-t)c2 + t^(3)B
+  // (1-t)^(3)A + 3t(1-t)^(2)c1 + 3t^(2)(1-t)c2 + t^(3)B
 	function bezierCurve(A, B, c1, c2, t, i) {
 		var firstTerm = pointMultiplyScalar(A, (1 - t + i) ** 3);
 		var secondTerm = pointMultiplyScalar(c1, 3 * ((1 - t + i) ** 2) * (t - i));
@@ -581,22 +581,28 @@ async function main() {
 
   var then = 0;
 	var timeSum = 0;
-	var animationDuration = 10;
   const numCurves = 2;
   /* console.log(parts); */
 
-
-
   var controls = new function() {
     this.t = 0;
+    this.animationDuration = 10;
+
   }
   var gui = new dat.GUI();
   gui.add(controls, 't', 0, numCurves).listen();
+  var controlAnimationDuration = gui.add(controls, 'animationDuration', 1, 100);
+  controlAnimationDuration.onChange(function(value) {
+    playing = false;
+    timeSum = 0;
+    controls.t = 0;
+  });
 
+  controlAnimationDuration.domElement.id = "animationDuration";
   var playing = false;
   var buttons = { play:function(){ playing=true },
   pause: function() { playing=false; },
-  reset: function() { playing=false; controls.t = 0; }
+  reset: function() { playing=false; controls.t = 0; timeSum = 0;}
   };
   gui.add(buttons,'play');
   gui.add(buttons,'pause');
@@ -607,10 +613,10 @@ async function main() {
     var deltaTime = time - then;
   	if (playing) { 
       timeSum += deltaTime;
-      if (timeSum > animationDuration) {
+      if (timeSum > controls.animationDuration) {
         timeSum = 0;
       }
-      controls.t = (timeSum / animationDuration) * numCurves;
+      controls.t = (timeSum / controls.animationDuration) * numCurves;
   	  if (controls.t > numCurves) controls.t = numCurves;
     }
     then = time;

@@ -7,3 +7,7 @@ canvas {
   height: 100vh;
   display: block;
 }
+
+ #animationDuration .slider {
+  display: none;
+ }
