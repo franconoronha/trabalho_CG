@@ -373,47 +373,58 @@ async function main() {
   }
   `;
 
-
+  async function loadObjMtl(path) {
+    var responseObj = await fetch("./models/" + path + ".obj");
+    var textObj = await responseObj.text();
+    var obj = parseOBJ(textObj);
+    var responseMtl = await fetch("./models/" + path + ".mtl");
+    var textMtl = await responseMtl.text();
+    var materials = parseMTL(textMtl);
+    return [obj, materials];
+  }
   // compiles and links the shaders, looks up attribute and uniform locations
   const meshProgramInfo = twgl.createProgramInfo(gl, [vs, fs]);
-  const response = await fetch("./models/EARTH.obj");
-  const text = await response.text();
-  const obj = parseOBJ(text);
- /*  const baseHref = new URL(objHref, window.location.href);
-  const matTexts = await Promise.all(obj.materialLibs.map(async filename => {
-    const matHref = new URL(filename, baseHref).href;
-    const response = await fetch(matHref);
-    return await response.text();
-  })); */
-  const matRes = await fetch("./models/EARTH.mtl");
-  const matTexts = await matRes.text();
-  const materials = await parseMTL(matTexts);
+  var [earthObj, earthMaterials] = await loadObjMtl("EARTH");
+  var [moonObj, moonMaterials] = await loadObjMtl("MOON");
 
-  const textures = {
+  var textures = {
     defaultWhite: twgl.createTexture(gl, {src: [255, 255, 255, 255]}),
     defaultNormal: twgl.createTexture(gl, {src: [127, 127, 255, 0]}),
   };
 
-  // load texture for materials
-  for (const material of Object.values(materials)) {
-    Object.entries(material)
-      .filter(([key]) => key.endsWith('Map'))
-      .forEach(([key, filename]) => {
-        let texture = textures[filename];
-        if (!texture) {
-          const textureHref = new URL("http://localhost:3000/img").href;
-          texture = twgl.createTexture(gl, {src: textureHref, flipY: true});
-          textures[filename] = texture;
-        }
-        material[key] = texture;
-      });
+
+  function loadTextures(obj, materials, path) {
+    // load texture for materials
+    for (const material of Object.values(materials)) {
+      Object.entries(material)
+        .filter(([key]) => key.endsWith('Map'))
+        .forEach(([key, filename]) => {
+          console.log(key);
+          let texture = textures[filename];
+          if (!texture) {
+            texture = twgl.createTexture(gl, {src: "/models/" + path + ".jpg", flipY: true});
+            textures[filename] = texture;
+          }
+          material[key] = texture;
+        });
+    }
+
+    obj.materials = materials;
   }
 
+  loadTextures(earthObj, earthMaterials, "EARTH");
+  loadTextures(moonObj, moonMaterials, "MOON");
+
   // hack the materials so we can see the specular map
-  Object.values(materials).forEach(m => {
+  Object.values(earthMaterials).forEach(m => {
     m.shininess = 100;
-    m.specular = [3, 2, 1];
+    m.specular = [1, 1, 1];
   });
+
+ /*  Object.values(moonMaterials).forEach(m => {
+    m.shininess = 100;
+    m.specular = [1, 1, 1];
+  }); */
 
   const defaultMaterial = {
     diffuse: [1, 1, 1],
@@ -426,114 +437,64 @@ async function main() {
     opacity: 1,
   };
 
-  const parts = obj.geometries.map(({material, data}) => {
-    // Because data is just named arrays like this
-    //
-    // {
-    //   position: [...],
-    //   texcoord: [...],
-    //   normal: [...],
-    // }
-    //
-    // and because those names match the attributes in our vertex
-    // shader we can pass it directly into `createBufferInfoFromArrays`
-    // from the article "less code more fun".
-
-    if (data.color) {
-      if (data.position.length === data.color.length) {
-        // it's 3. The our helper library assumes 4 so we need
-        // to tell it there are only 3.
-        data.color = { numComponents: 3, data: data.color };
+  function objPrep(obj) {
+    const parts = obj.geometries.map(({material, data}) => {  
+      if (data.color) {
+        if (data.position.length === data.color.length) {
+          // it's 3. The our helper library assumes 4 so we need
+          // to tell it there are only 3.
+          data.color = { numComponents: 3, data: data.color };
+        }
+      } else {
+        // there are no vertex colors so just use constant white
+        data.color = { value: [1, 1, 1, 1] };
       }
-    } else {
-      // there are no vertex colors so just use constant white
-      data.color = { value: [1, 1, 1, 1] };
-    }
-
-    // generate tangents if we have the data to do so.
-    if (data.texcoord && data.normal) {
-      data.tangent = generateTangents(data.position, data.texcoord);
-    } else {
-      // There are no tangents
-      data.tangent = { value: [1, 0, 0] };
-    }
-
-    if (!data.texcoord) {
-      data.texcoord = { value: [0, 0] };
-    }
-
-    if (!data.normal) {
-      // we probably want to generate normals if there are none
-      data.normal = { value: [0, 0, 1] };
-    }
-
-    // create a buffer for each array by calling
-    // gl.createBuffer, gl.bindBuffer, gl.bufferData
-    const bufferInfo = twgl.createBufferInfoFromArrays(gl, data);
-    const vao = twgl.createVAOFromBufferInfo(gl, meshProgramInfo, bufferInfo);
-    return {
-      material: {
-        ...defaultMaterial,
-        ...materials[material],
-      },
-      bufferInfo,
-      vao,
-    };
-  });
-  console.log("--------------------");
-  console.log(parts);
-  console.log("--------------------");
-
-  /* function getExtents(positions) {
-    const min = positions.slice(0, 3);
-    const max = positions.slice(0, 3);
-    for (let i = 3; i < positions.length; i += 3) {
-      for (let j = 0; j < 3; ++j) {
-        const v = positions[i + j];
-        min[j] = Math.min(v, min[j]);
-        max[j] = Math.max(v, max[j]);
+  
+      // generate tangents if we have the data to do so.
+      if (data.texcoord && data.normal) {
+        data.tangent = generateTangents(data.position, data.texcoord);
+      } else {
+        // There are no tangents
+        data.tangent = { value: [1, 0, 0] };
       }
-    }
-    return {min, max};
-  } */
-
-  /* function getGeometriesExtents(geometries) {
-    return geometries.reduce(({min, max}, {data}) => {
-      const minMax = getExtents(data.position);
+  
+      if (!data.texcoord) {
+        data.texcoord = { value: [0, 0] };
+      }
+  
+      if (!data.normal) {
+        // we probably want to generate normals if there are none
+        data.normal = { value: [0, 0, 1] };
+      }
+  
+      // create a buffer for each array by calling
+      // gl.createBuffer, gl.bindBuffer, gl.bufferData
+      const bufferInfo = twgl.createBufferInfoFromArrays(gl, data);
+      const vao = twgl.createVAOFromBufferInfo(gl, meshProgramInfo, bufferInfo);
       return {
-        min: min.map((min, ndx) => Math.min(minMax.min[ndx], min)),
-        max: max.map((max, ndx) => Math.max(minMax.max[ndx], max)),
+        material: {
+          ...defaultMaterial,
+          ...obj.materials[material],
+        },
+        bufferInfo,
+        vao,
       };
-    }, {
-      min: Array(3).fill(Number.POSITIVE_INFINITY),
-      max: Array(3).fill(Number.NEGATIVE_INFINITY),
     });
-  } */
 
-  /* const extents = getGeometriesExtents(obj.geometries); */
-  /* const range = m4.subtractVectors(extents.max, extents.min); */
-  // amount to move the object so its center is at the origin
-  /* const objOffset = m4.scaleVector(
-      m4.addVectors(
-        extents.min,
-        m4.scaleVector(range, 0.5)),
-      -1); */
-  // const cameraTarget = [0, 0, 0];
-  // figure out how far away to move the camera so we can likely
-  // see the object.
-  /* const radius = m4.length(range) * 0.5; */
-  /* const cameraPosition = m4.addVectors(cameraTarget, [
-    0,
-    50,
-    radius,
-  ]); */
-  // Set zNear and zFar to something hopefully appropriate
-  // for the size of this object.
-  /* const zNear = radius / 100;
-  const zFar = radius * 20; */
+    return parts;
+  }
+  var earthModel = objPrep(earthObj);
+  earthModel.localMatrix = m4.identity();
+  earthModel.worldMatrix = m4.translation(200, 200, 0);
+
+  var moonModel = objPrep(moonObj);
+  moonModel.localMatrix = m4.identity();
+  moonModel.worldMatrix = m4.translation(500, 200, 0);
+  
+  var allModels = [earthModel, moonModel];
+
   const zNear = 10;
-  const zFar = 300;
-  console.log("zNear:" + zNear + " zFar:" + zFar);
+  const zFar = 1000;
 
   function degToRad(deg) {
     return deg * Math.PI / 180;
@@ -582,7 +543,6 @@ async function main() {
   var then = 0;
 	var timeSum = 0;
   const numCurves = 2;
-  /* console.log(parts); */
 
   var controls = new function() {
     this.t = 0;
@@ -623,7 +583,6 @@ async function main() {
     var curveNum = Math.floor(controls.t);
     var cameraPosition = curves[curveNum](controls.t);
     var cameraTarget = curves[curveNum](controls.t + 0.01);
-    /* console.log(cameraPosition); */
 
     twgl.resizeCanvasToDisplaySize(gl.canvas);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -656,21 +615,20 @@ async function main() {
     // calls gl.uniform
     twgl.setUniforms(meshProgramInfo, sharedUniforms);
 
-    // compute the world matrix once since all parts
-    // are at the same space.
-    let u_world = m4.translation(200, 200, 0);
-    //u_world = m4.translate(u_world, ...objOffset);
-
-    for (const {bufferInfo, vao, material} of parts) {
-      // set the attributes for this part.
-      gl.bindVertexArray(vao);
-      // calls gl.uniform
-      twgl.setUniforms(meshProgramInfo, {
-        u_world,
-      }, material);
-      // calls gl.drawArrays or gl.drawElements
-      twgl.drawBufferInfo(gl, bufferInfo);
-    }
+    allModels.forEach(model => {
+      for (const {bufferInfo, vao, material} of model) {
+        let u_world = model.worldMatrix;
+        // set the attributes for this part.
+        gl.bindVertexArray(vao);
+        // calls gl.uniform
+        twgl.setUniforms(meshProgramInfo, {
+          u_world,
+        }, material);
+        // calls gl.drawArrays or gl.drawElements
+        twgl.drawBufferInfo(gl, bufferInfo);
+      }
+    });
+    
 
     requestAnimationFrame(render);
   }
