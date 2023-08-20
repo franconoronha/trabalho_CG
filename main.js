@@ -384,8 +384,7 @@ async function main() {
   }
   // compiles and links the shaders, looks up attribute and uniform locations
   const meshProgramInfo = twgl.createProgramInfo(gl, [vs, fs]);
-  var [earthObj, earthMaterials] = await loadObjMtl("EARTH");
-  var [moonObj, moonMaterials] = await loadObjMtl("MOON");
+  var [casaObj, casaMaterials] = await loadObjMtl("casa");
 
   var textures = {
     defaultWhite: twgl.createTexture(gl, {src: [255, 255, 255, 255]}),
@@ -399,10 +398,9 @@ async function main() {
       Object.entries(material)
         .filter(([key]) => key.endsWith('Map'))
         .forEach(([key, filename]) => {
-          console.log(key);
           let texture = textures[filename];
           if (!texture) {
-            texture = twgl.createTexture(gl, {src: "/models/" + path + ".jpg", flipY: true});
+            texture = twgl.createTexture(gl, {src: "/models/" + filename, flipY: true});
             textures[filename] = texture;
           }
           material[key] = texture;
@@ -412,19 +410,8 @@ async function main() {
     obj.materials = materials;
   }
 
-  loadTextures(earthObj, earthMaterials, "EARTH");
-  loadTextures(moonObj, moonMaterials, "MOON");
-
-  // hack the materials so we can see the specular map
-  Object.values(earthMaterials).forEach(m => {
-    m.shininess = 100;
-    m.specular = [1, 1, 1];
-  });
-
- /*  Object.values(moonMaterials).forEach(m => {
-    m.shininess = 100;
-    m.specular = [1, 1, 1];
-  }); */
+  loadTextures(casaObj, casaMaterials, "textur");
+  console.log(casaMaterials);
 
   const defaultMaterial = {
     diffuse: [1, 1, 1],
@@ -470,6 +457,7 @@ async function main() {
       // create a buffer for each array by calling
       // gl.createBuffer, gl.bindBuffer, gl.bufferData
       const bufferInfo = twgl.createBufferInfoFromArrays(gl, data);
+
       const vao = twgl.createVAOFromBufferInfo(gl, meshProgramInfo, bufferInfo);
       return {
         material: {
@@ -483,16 +471,14 @@ async function main() {
 
     return parts;
   }
-  var earthModel = objPrep(earthObj);
-  earthModel.localMatrix = m4.identity();
-  earthModel.worldMatrix = m4.translation(200, 200, 0);
 
-  var moonModel = objPrep(moonObj);
-  moonModel.localMatrix = m4.identity();
-  moonModel.worldMatrix = m4.translation(500, 200, 0);
+  var casaModel = objPrep(casaObj);
+  casaModel.localMatrix = m4.identity();
+  casaModel.worldMatrix = m4.translation(20, 0, 40);
   
-  var allModels = [earthModel, moonModel];
-
+  var allModels = [casaModel];
+  console.log("------------");
+  console.log(casaModel);
   const zNear = 10;
   const zFar = 1000;
 
@@ -500,13 +486,38 @@ async function main() {
     return deg * Math.PI / 180;
   }
   	
-	var pointA = [0, 0, 0];
-	var pointB = [100, 100, 0];	
-  var pointC = [200, 200, 0];
-  var pointC1 = [0, 0, 0];
-	var pointC2 = [40, 100, 0];
-  var pointC3 = [150, 100, 0];
-  var pointC4 = [150, 250, 0];
+/* 	var pointA = [20, 10, -40];
+	var pointB = [20, 10, 40];	 */
+
+  // A = [2, 10, 8];
+  // B = [0.6349, 10, 7.0151];
+  // C = [1.1108, 10, 1.3021];
+  // D = [3.9012, 10, 1.6186];
+  // E = [2, 10, 5];
+  // c1 = [1.8377, 10, 7.5043]
+  // c2 = [1.0873, 10, 8.2781]
+  // c3 = [0.2277, 10, 5.8783];
+  // c4 = [-0.2492, 10, 2.6621]
+  // c5 = [2.3348, 10, 0.0780];
+  // c6 = [5.0736, 10, 5.3235];
+  // c7 = [2.8460, 10, -1.7157];
+  // c8 = [4.3467, 10, 9.1574];
+//[20.839534425497, 10 ,64.725923420933]
+  var pointA = [20, 10, 80];
+  var pointB = [6.349, 10, 70.151];
+
+  var pointC = [11.108, 10, 13.021];
+  var pointD = [39.012, 10, 16.186];
+  var pointE = [20, 10, 50];
+
+  var pointC1 = [20.839534425497, 10 ,64.725923420933];
+  var pointC2 = [10.873, 10, 82.781];
+  var pointC3 = [2.277, 10, 58.783];
+  var pointC4 = [-2.492, 10, 26.621];
+  var pointC5 = [23.348, 10, 0.780];
+  var pointC6 = [50.736, 10, 53.235];
+  var pointC7 = [28.460, 10, -17.157];
+  var pointC8 = [43.467, 10, 91.574];
 
 	//var cameraMovementSpeed = 1;
 
@@ -537,20 +548,28 @@ async function main() {
 		return pointSum(firstTerm, pointSum(secondTerm, pointSum(thirdTerm, fourthTerm)));
 	}
 
-  var curves = [function(t) { return bezierCurve(pointA, pointB, pointC1, pointC2, t, 0)},
-                (t) => bezierCurve(pointB, pointC, pointC3, pointC4, t, 1)];
+  var curves = [(t) => bezierCurve(pointA, pointB, pointC1, pointC2, t, 0),
+                (t) => bezierCurve(pointB, pointC, pointC3, pointC4, t, 1),
+                (t) => bezierCurve(pointC, pointD, pointC5, pointC6, t, 2),
+                (t) => bezierCurve(pointD, pointE, pointC7, pointC8, t, 3)];
 
   var then = 0;
 	var timeSum = 0;
-  const numCurves = 2;
+  const numCurves = curves.length;
 
   var controls = new function() {
     this.t = 0;
     this.animationDuration = 10;
-
+    /* this.x = 20
+    this.y = 10;
+    this.z = 80; */
   }
+
   var gui = new dat.GUI();
   gui.add(controls, 't', 0, numCurves).listen();
+ /*  gui.add(controls, 'x', -100, 100);
+  gui.add(controls, 'y', -100, 100);
+  gui.add(controls, 'z', -100, 100); */
   var controlAnimationDuration = gui.add(controls, 'animationDuration', 1, 100);
   controlAnimationDuration.onChange(function(value) {
     playing = false;
@@ -569,6 +588,7 @@ async function main() {
   gui.add(buttons,'reset');
 
   function render(time) {
+    console.log(controls.t);
     time *= 0.001;  // convert to seconds
     var deltaTime = time - then;
   	if (playing) { 
@@ -581,15 +601,17 @@ async function main() {
     }
     then = time;
     var curveNum = Math.floor(controls.t);
+    if(curveNum >= numCurves) curveNum = numCurves - 1;
     var cameraPosition = curves[curveNum](controls.t);
     var cameraTarget = curves[curveNum](controls.t + 0.01);
-
+    /* var cameraPosition = [controls.x, controls.y, controls.z];
+    var cameraTarget = [20, 0, 40]; */
     twgl.resizeCanvasToDisplaySize(gl.canvas);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     /* gl.enable(gl.CULL_FACE); */
     gl.enable(gl.DEPTH_TEST);
 
-    gl.clearColor(0, 0, 0, 1);
+    gl.clearColor(0, 0.5, 0.5, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     const fieldOfViewRadians = degToRad(60);
@@ -604,7 +626,7 @@ async function main() {
     const view = m4.inverse(camera);
 
     const sharedUniforms = {
-      u_lightDirection: m4.normalize([-1, 3, 5]),
+      u_lightDirection: m4.normalize([-5, 1, 5]),
       u_view: view,
       u_projection: projection,
       u_viewWorldPosition: cameraPosition,
@@ -614,7 +636,7 @@ async function main() {
 
     // calls gl.uniform
     twgl.setUniforms(meshProgramInfo, sharedUniforms);
-
+    /* twgl.setUniforms(meshProgramInfo2, sharedUniforms); */
     allModels.forEach(model => {
       for (const {bufferInfo, vao, material} of model) {
         let u_world = model.worldMatrix;
