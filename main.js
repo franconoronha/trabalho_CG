@@ -385,6 +385,7 @@ async function main() {
   // compiles and links the shaders, looks up attribute and uniform locations
   const meshProgramInfo = twgl.createProgramInfo(gl, [vs, fs]);
   var [casaObj, casaMaterials] = await loadObjMtl("casa");
+  var [fishObj, fishMaterials] = await loadObjMtl("fish");
 
   var textures = {
     defaultWhite: twgl.createTexture(gl, {src: [255, 255, 255, 255]}),
@@ -410,7 +411,8 @@ async function main() {
     obj.materials = materials;
   }
 
-  loadTextures(casaObj, casaMaterials, "textur");
+  loadTextures(casaObj, casaMaterials, "textur.jpg");
+  loadTextures(fishObj, fishMaterials, "fish_texture.png");
   console.log(casaMaterials);
 
   const defaultMaterial = {
@@ -473,10 +475,14 @@ async function main() {
   }
 
   var casaModel = objPrep(casaObj);
-  casaModel.localMatrix = m4.identity();
   casaModel.worldMatrix = m4.translation(20, 0, 40);
   
-  var allModels = [casaModel];
+  var fishModel = objPrep(fishObj);
+  fishModel.worldMatrix = m4.translation(40, 0, 40);
+  fishModel.translationSum = 0;
+  var allModels = [casaModel, fishModel];
+
+  
   console.log("------------");
   console.log(casaModel);
   const zNear = 10;
@@ -502,7 +508,7 @@ async function main() {
   // c6 = [5.0736, 10, 5.3235];
   // c7 = [2.8460, 10, -1.7157];
   // c8 = [4.3467, 10, 9.1574];
-//[20.839534425497, 10 ,64.725923420933]
+  // [20.839534425497, 10 ,64.725923420933]
   var pointA = [20, 10, 80];
   var pointB = [6.349, 10, 70.151];
 
@@ -604,6 +610,11 @@ async function main() {
     if(curveNum >= numCurves) curveNum = numCurves - 1;
     var cameraPosition = curves[curveNum](controls.t);
     var cameraTarget = curves[curveNum](controls.t + 0.01);
+
+    fishModel.translationSum += 0.005;
+    fishModel.translate = [0, Math.sin(fishModel.translationSum) * 10, 0];
+    fishModel.worldMatrix = m4.translate(fishModel.worldMatrix, ...fishModel.translate);
+    console.log(fishModel.translate);
     /* var cameraPosition = [controls.x, controls.y, controls.z];
     var cameraTarget = [20, 0, 40]; */
     twgl.resizeCanvasToDisplaySize(gl.canvas);
