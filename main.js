@@ -478,13 +478,25 @@ async function main() {
   casaModel.worldMatrix = m4.translation(20, 0, 40);
   
   var fishModel = objPrep(fishObj);
-  fishModel.worldMatrix = m4.translation(40, 0, 40);
-  fishModel.translationSum = 0;
-  var allModels = [casaModel, fishModel];
+  var fishModel2 = objPrep(fishObj);
 
-  
-  console.log("------------");
-  console.log(casaModel);
+  var fishOrbit = m4.translation(20, 0, 40);
+  var fishOrbit2 = m4.translation(20, 0, 40);
+
+  fishModel.source = m4.translation(20, 0, 0);
+  fishModel2.source = m4.translation(25, 0, 0);
+
+  fishModel.localMatrix = fishModel.source;
+  fishModel2.localMatrix = fishModel2.source;
+
+  fishModel.worldMatrix = m4.multiply(fishOrbit, fishModel.localMatrix); 
+  fishModel2.worldMatrix = m4.multiply(fishOrbit2, fishModel2.localMatrix);
+
+  fishModel.translationSum = 0;
+  fishModel2.translationSum = 0;
+
+  var allModels = [casaModel, fishModel, fishModel2];
+
   const zNear = 10;
   const zFar = 1000;
 
@@ -492,54 +504,24 @@ async function main() {
     return deg * Math.PI / 180;
   }
   	
-/* 	var pointA = [20, 10, -40];
-	var pointB = [20, 10, 40];	 */
+  var pointA = [22.5642, 10, 80.2629];
+  var pointB = [3.3345, 10, 51.8291];
+  var pointC = [3.6632, 10, 35.0648];
+  var pointD = [28.481, 10, 26.6826];
+  var pointE = [38.0137, 10, 37.037];
 
-  // A = [2, 10, 8];
-  // B = [0.6349, 10, 7.0151];
-  // C = [1.1108, 10, 1.3021];
-  // D = [3.9012, 10, 1.6186];
-  // E = [2, 10, 5];
-  // c1 = [1.8377, 10, 7.5043]
-  // c2 = [1.0873, 10, 8.2781]
-  // c3 = [0.2277, 10, 5.8783];
-  // c4 = [-0.2492, 10, 2.6621]
-  // c5 = [2.3348, 10, 0.0780];
-  // c6 = [5.0736, 10, 5.3235];
-  // c7 = [2.8460, 10, -1.7157];
-  // c8 = [4.3467, 10, 9.1574];
-  // [20.839534425497, 10 ,64.725923420933]
-  var pointA = [20, 10, 80];
-  var pointB = [6.349, 10, 70.151];
-
-  var pointC = [11.108, 10, 13.021];
-  var pointD = [39.012, 10, 16.186];
-  var pointE = [20, 10, 50];
-
-  var pointC1 = [20.839534425497, 10 ,64.725923420933];
-  var pointC2 = [10.873, 10, 82.781];
-  var pointC3 = [2.277, 10, 58.783];
-  var pointC4 = [-2.492, 10, 26.621];
-  var pointC5 = [23.348, 10, 0.780];
-  var pointC6 = [50.736, 10, 53.235];
-  var pointC7 = [28.460, 10, -17.157];
-  var pointC8 = [43.467, 10, 91.574];
-
-	//var cameraMovementSpeed = 1;
+  var pointC1 = [26.5088, 10, 55.7737];
+  var pointC2 = [-3.7328, 10, 59.3896];
+  var pointC3 = [6.868, 10, 48.048];
+  var pointC4 = [17.962, 10, 43.364];
+  var pointC5 = [-3.486, 10, 30.914];
+  var pointC6 = [-13.409, 10, 27.935];
+  var pointC7 = [49.426, 10, 26.056];
+  var pointC8 = [72.852, 10, 26.174];
 
 	function pointSum(A, B) {
 		return [A[0] + B[0], A[1] + B[1], A[2] + B[2]];
 	}
-	
-  function sumPointList(pointList) {
-    var sum = [0, 0, 0];
-    for (let i = 0; i < pointList.length; i++) {
-      sum[0] += pointList[i][0];
-      sum[1] += pointList[i][1];
-      sum[2] += pointList[i][2];
-    }
-    return sum;
-  }
 
 	function pointMultiplyScalar(A, s) {
 		return [A[0] * s, A[1] * s, A[2] * s];
@@ -560,26 +542,21 @@ async function main() {
                 (t) => bezierCurve(pointD, pointE, pointC7, pointC8, t, 3)];
 
   var then = 0;
-	var timeSum = 0;
+  var animationTimeSum = 0;
   const numCurves = curves.length;
 
   var controls = new function() {
     this.t = 0;
     this.animationDuration = 10;
-    /* this.x = 20
-    this.y = 10;
-    this.z = 80; */
   }
 
   var gui = new dat.GUI();
   gui.add(controls, 't', 0, numCurves).listen();
- /*  gui.add(controls, 'x', -100, 100);
-  gui.add(controls, 'y', -100, 100);
-  gui.add(controls, 'z', -100, 100); */
+  
   var controlAnimationDuration = gui.add(controls, 'animationDuration', 1, 100);
   controlAnimationDuration.onChange(function(value) {
     playing = false;
-    timeSum = 0;
+    animationTimeSum = 0;
     controls.t = 0;
   });
 
@@ -587,36 +564,57 @@ async function main() {
   var playing = false;
   var buttons = { play:function(){ playing=true },
   pause: function() { playing=false; },
-  reset: function() { playing=false; controls.t = 0; timeSum = 0;}
+  reset: function() { playing=false; controls.t = 0; animationTimeSum = 0;}
   };
   gui.add(buttons,'play');
   gui.add(buttons,'pause');
   gui.add(buttons,'reset');
+  
+  var animationControls = new function() {
+    this.rotationSpeed = 2;
+    this.translationSpeed = 6;
+    this.amplitude = 3;
+  }
+
+  var animationFolder = gui.addFolder('Animation Controls');
+  animationFolder.add(animationControls, 'rotationSpeed', -10, 10);
+  animationFolder.add(animationControls, 'translationSpeed', -10, 10);
+  animationFolder.add(animationControls, 'amplitude', -10, 10);
 
   function render(time) {
-    console.log(controls.t);
     time *= 0.001;  // convert to seconds
     var deltaTime = time - then;
+
   	if (playing) { 
-      timeSum += deltaTime;
-      if (timeSum > controls.animationDuration) {
-        timeSum = 0;
+      animationTimeSum += deltaTime;
+      if (animationTimeSum > controls.animationDuration) {
+        animationTimeSum = 0;
       }
-      controls.t = (timeSum / controls.animationDuration) * numCurves;
+      controls.t = (animationTimeSum / controls.animationDuration) * numCurves;
   	  if (controls.t > numCurves) controls.t = numCurves;
     }
+
     then = time;
+
     var curveNum = Math.floor(controls.t);
     if(curveNum >= numCurves) curveNum = numCurves - 1;
+
     var cameraPosition = curves[curveNum](controls.t);
     var cameraTarget = curves[curveNum](controls.t + 0.01);
+    
 
-    fishModel.translationSum += 0.005;
-    fishModel.translate = [0, Math.sin(fishModel.translationSum) * 10, 0];
-    fishModel.worldMatrix = m4.translate(fishModel.worldMatrix, ...fishModel.translate);
-    console.log(fishModel.translate);
-    /* var cameraPosition = [controls.x, controls.y, controls.z];
-    var cameraTarget = [20, 0, 40]; */
+    fishModel.translationSum += deltaTime * animationControls.translationSpeed;
+    fishModel2.translationSum += deltaTime * animationControls.translationSpeed * 0.8;
+    var translationMatrix = m4.translation(0, Math.sin(fishModel.translationSum) * animationControls.amplitude, 0);
+    var translationMatrix2 = m4.translation(0, Math.sin(fishModel2.translationSum) * animationControls.amplitude, 0);
+    fishModel.localMatrix = m4.multiply(translationMatrix, fishModel.source);
+    fishModel2.localMatrix = m4.multiply(translationMatrix2, fishModel2.source);
+
+    fishOrbit = m4.yRotate(fishOrbit, -(deltaTime * animationControls.rotationSpeed));
+    fishOrbit2 = m4.yRotate(fishOrbit2, -(deltaTime * animationControls.rotationSpeed * 0.8));
+    fishModel.worldMatrix = m4.multiply(fishOrbit, fishModel.localMatrix);
+    fishModel2.worldMatrix = m4.multiply(fishOrbit2, fishModel2.localMatrix);
+    
     twgl.resizeCanvasToDisplaySize(gl.canvas);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     /* gl.enable(gl.CULL_FACE); */
