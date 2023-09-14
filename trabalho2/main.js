@@ -1,6 +1,7 @@
 "use strict";
 
 import { terrainVS, terrainFS } from "./terrainShaders.js";
+import { ballVS, ballFS } from "./ballShader.js";
 import { vs, fs } from "./objShaders.js"
 
 async function main() {
@@ -18,7 +19,6 @@ async function main() {
   /* var [casaObj, casaMaterials] = await loadObjMtl("casa"); */
 
   var allModels = [];
-
   const zNear = 10;
   const zFar = 1000;
 
@@ -70,9 +70,12 @@ async function main() {
   let controls = new function() {
     this.t = 0;
     this.animationDuration = 10;
-    this.lightx = 5;
-    this.lighty = 1;
-    this.lightz = 0.2;
+    this.lightx = -10;
+    this.lighty = 3;
+    this.lightz = -10;
+    this.cameraX = -300;
+    this.cameraY = 100;
+    this.cameraZ = 300;
   }
 
   let gui = new dat.GUI();
@@ -99,16 +102,36 @@ async function main() {
   gui.add(controls, 'lightx', -10, 10);
   gui.add(controls, 'lighty', -10, 10);
   gui.add(controls, 'lightz', -10, 10);
+  gui.add(controls, 'cameraX', -200, 300);
+  gui.add(controls, 'cameraY', 0, 300);
+  gui.add(controls, 'cameraZ', -200, 300);
+
   const terrainProgramInfo = twgl.createProgramInfo(gl, [terrainVS, terrainFS]);
+  const ballProgramInfo = twgl.createProgramInfo(gl, [ballVS, ballFS]);
+
+  //let balls = [];
+  let ball = twgl.primitives.createSphereBufferInfo(gl, 5, 64, 64);
+  console.log(ball);
+  let ballWorldMatrix = m4.translation(-100, 30, 200);
+
+  function drawBalls(sharedUniforms) {
+    gl.useProgram(ballProgramInfo.program);
+    twgl.setBuffersAndAttributes(gl, ballProgramInfo, ball);
+    twgl.setUniforms(ballProgramInfo, {
+      u_world : ballWorldMatrix,
+    });
+    twgl.setUniforms(ballProgramInfo, sharedUniforms);
+    twgl.drawBufferInfo(gl, ball);
+  }
 
   const terrainBufferInfo = twgl.primitives.createPlaneBufferInfo(
     gl,
-    96 * 2,  // width
-    64 * 2,  // height
-    96 * 2,  // quads across
-    64 * 2,  // quads down
+    960,  // width
+    960,  // height
+    240,  // quads across
+    240,  // quads down
 );
-
+  
   const heightMapTexture = twgl.createTexture(gl, {
     src: './models/heightmap_3.png',
     minMag: gl.NEAREST,
@@ -123,12 +146,13 @@ async function main() {
 
   let terrain_worldMatrix = m4.identity();
 
-  console.log(terrainBufferInfo);
+  
+
   function drawTerrain(sharedUniforms) {
     gl.useProgram(terrainProgramInfo.program);
     twgl.setBuffersAndAttributes(gl, terrainProgramInfo, terrainBufferInfo);
-    twgl.setUniformsAndBindTextures(terrainProgramInfo, sharedUniforms);
-    twgl.setUniforms(terrainProgramInfo, {
+    twgl.setUniforms(terrainProgramInfo, sharedUniforms);
+    twgl.setUniformsAndBindTextures(terrainProgramInfo, {
       u_world : terrain_worldMatrix,
       displacementMap: heightMapTexture,
       normalMap : normalMapTexture
@@ -154,8 +178,9 @@ async function main() {
     var curveNum = Math.floor(controls.t);
     if(curveNum >= numCurves) curveNum = numCurves - 1;
 
-    let cameraPosition = [0, 100, 100];
-    let cameraTarget = [0, 0, 0];
+    //let cameraPosition = [0, 100, 100];
+    let cameraPosition = [controls.cameraX, controls.cameraY, controls.cameraZ];
+    let cameraTarget = [ballWorldMatrix[12], ballWorldMatrix[13], ballWorldMatrix[14]];
     /* var cameraPosition = curves[curveNum](controls.t);
     var cameraTarget = curves[curveNum](controls.t + 0.01); */
     
@@ -183,10 +208,12 @@ async function main() {
       u_view: view,
       u_projection: projection,
       u_viewWorldPosition: cameraPosition,
+      u_lightWorldPosition: ballWorldMatrix.slice(12, 15)
     };
 
     drawTerrain(sharedUniforms);
-    
+    drawBalls(sharedUniforms);
+
     gl.useProgram(meshProgramInfo.program);
 
     // calls gl.uniform
