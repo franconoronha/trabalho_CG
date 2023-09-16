@@ -5,7 +5,6 @@ import { ballVS, ballFS } from "./ballShader.js";
 import { vs, fs } from "./objShaders.js"
 
 async function main() {
-  // Get A WebGL context
   /** @type {HTMLCanvasElement} */
   const canvas = document.querySelector("#canvas");
   const gl = canvas.getContext("webgl2");
@@ -16,45 +15,39 @@ async function main() {
   // compiles and links the shaders, looks up attribute and uniform locations
   const meshProgramInfo = twgl.createProgramInfo(gl, [vs, fs]);
 
-  /* var [casaObj, casaMaterials] = await loadObjMtl("casa"); */
+  /* let [casaObj, casaMaterials] = await loadObjMtl("casa"); */
 
-  var allModels = [];
+  let allModels = [];
   const zNear = 10;
   const zFar = 1000;
 
-  function degToRad(deg) {
-    return deg * Math.PI / 180;
-  }
+  let degToRad = (deg) => deg * Math.PI / 180;
 
-	function pointSum(A, B) {
-		return [A[0] + B[0], A[1] + B[1], A[2] + B[2]];
-	}
+  let pointSum = (A, B) => [A[0] + B[0], A[1] + B[1], A[2] + B[2]];
 
-	function pointMultiplyScalar(A, s) {
-		return [A[0] * s, A[1] * s, A[2] * s];
-	}
+  let pointMultiplyScalar = (A, s) => [A[0] * s, A[1] * s, A[2] * s];
 
-  var pointA = [0, 100, 0];
-  var pointB = [0, 0, 0];
-  var pointC = [3.6632, 10, 35.0648];
-  var pointD = [28.481, 10, 26.6826];
-  var pointE = [38.0137, 10, 37.037];
+  let pointA = [0, 100, 0];
+  let pointB = [0, 0, 0];
+  let pointC = [3.6632, 10, 35.0648];
+  let pointD = [28.481, 10, 26.6826];
+  let pointE = [38.0137, 10, 37.037];
 
-  var pointC1 = [0, 100, 0];
-  var pointC2 = [-3.7328, 10, 59.3896];
-  var pointC3 = [6.868, 10, 48.048];
-  var pointC4 = [17.962, 10, 43.364];
-  var pointC5 = [-3.486, 10, 30.914];
-  var pointC6 = [-13.409, 10, 27.935];
-  var pointC7 = [49.426, 10, 26.056];
-  var pointC8 = [72.852, 10, 26.174];
+  let pointC1 = [0, 100, 0];
+  let pointC2 = [-3.7328, 10, 59.3896];
+  let pointC3 = [6.868, 10, 48.048];
+  let pointC4 = [17.962, 10, 43.364];
+  let pointC5 = [-3.486, 10, 30.914];
+  let pointC6 = [-13.409, 10, 27.935];
+  let pointC7 = [49.426, 10, 26.056];
+  let pointC8 = [72.852, 10, 26.174];
 
   // (1-t)^(3)A + 3t(1-t)^(2)c1 + 3t^(2)(1-t)c2 + t^(3)B
 	function bezierCurve(A, B, c1, c2, t, i) {
-		var firstTerm = pointMultiplyScalar(A, (1 - t + i) ** 3);
-		var secondTerm = pointMultiplyScalar(c1, 3 * ((1 - t + i) ** 2) * (t - i));
-		var thirdTerm = pointMultiplyScalar(c2, 3 * (1 - t + i) * ((t - i) ** 2));
-		var fourthTerm = pointMultiplyScalar(B, (t - i) ** 3);
+		let firstTerm = pointMultiplyScalar(A, (1 - t + i) ** 3);
+		let secondTerm = pointMultiplyScalar(c1, 3 * ((1 - t + i) ** 2) * (t - i));
+		let thirdTerm = pointMultiplyScalar(c2, 3 * (1 - t + i) * ((t - i) ** 2));
+		let fourthTerm = pointMultiplyScalar(B, (t - i) ** 3);
 		return pointSum(firstTerm, pointSum(secondTerm, pointSum(thirdTerm, fourthTerm)));
 	}
 
@@ -76,6 +69,9 @@ async function main() {
     this.cameraX = -300;
     this.cameraY = 100;
     this.cameraZ = 300;
+    this.kc = 0.3;
+    this.kl = 0.001;
+    this.kq = 0.0001;
   }
 
   let gui = new dat.GUI();
@@ -89,29 +85,39 @@ async function main() {
   });
 
   controlAnimationDuration.domElement.id = "animationDuration";
-  let playing = false;
-  let buttons = { play:function(){ playing=true },
-  pause: function() { playing=false; },
-  reset: function() { playing=false; controls.t = 0; animationTimeSum = 0;},
-  lightconfig: function() { controls.lightx = 2, controls.lighty = -8, controls.lightz = -8;}
+    let playing = false;
+    let buttons = { play:function(){ playing=true },
+    pause: function() { playing=false; },
+    reset: function() { playing=false; controls.t = 0; animationTimeSum = 0;},
+    lightconfig: function() { controls.lightx = 2, controls.lighty = -8, controls.lightz = -8;}
   };
-  gui.add(buttons,'play');
-  gui.add(buttons,'pause');
-  gui.add(buttons,'reset');
-  gui.add(buttons, 'lightconfig');
-  gui.add(controls, 'lightx', -10, 10);
-  gui.add(controls, 'lighty', -10, 10);
-  gui.add(controls, 'lightz', -10, 10);
-  gui.add(controls, 'cameraX', -200, 300);
-  gui.add(controls, 'cameraY', 0, 300);
-  gui.add(controls, 'cameraZ', -200, 300);
+
+  let animationFolder = gui.addFolder("Animation");
+  animationFolder.add(buttons,'play');
+  animationFolder.add(buttons,'pause');
+  animationFolder.add(buttons,'reset');
+
+  let lightFolder = gui.addFolder("Light");
+  lightFolder.add(buttons, 'lightconfig');
+  lightFolder.add(controls, 'lightx', -10, 10);
+  lightFolder.add(controls, 'lighty', -10, 10);
+  lightFolder.add(controls, 'lightz', -10, 10);
+
+  let cameraFolder = gui.addFolder("Camera");
+  cameraFolder.add(controls, 'cameraX', -200, 300);
+  cameraFolder.add(controls, 'cameraY', 0, 300);
+  cameraFolder.add(controls, 'cameraZ', -200, 300);
+
+  let attenuationFolder = gui.addFolder("Attenuation");
+  attenuationFolder.add(controls, 'kc', -2, 2);
+  attenuationFolder.add(controls, 'kl', 0, 0.1);
+  attenuationFolder.add(controls, 'kq', 0, 0.01);
 
   const terrainProgramInfo = twgl.createProgramInfo(gl, [terrainVS, terrainFS]);
   const ballProgramInfo = twgl.createProgramInfo(gl, [ballVS, ballFS]);
 
   //let balls = [];
   let ball = twgl.primitives.createSphereBufferInfo(gl, 5, 64, 64);
-  console.log(ball);
   let ballWorldMatrix = m4.translation(-100, 30, 200);
 
   function drawBalls(sharedUniforms) {
@@ -146,8 +152,6 @@ async function main() {
 
   let terrain_worldMatrix = m4.identity();
 
-  
-
   function drawTerrain(sharedUniforms) {
     gl.useProgram(terrainProgramInfo.program);
     twgl.setBuffersAndAttributes(gl, terrainProgramInfo, terrainBufferInfo);
@@ -160,9 +164,13 @@ async function main() {
     twgl.drawBufferInfo(gl, terrainBufferInfo);
   }
 
+  let ballTranslation = [0, 0, 0];
+
   function render(time) {
     time *= 0.001;  // convert to seconds
-    var deltaTime = time - then;
+    let deltaTime = time - then;
+    ballTranslation[0] += deltaTime;
+    ballWorldMatrix = m4.translate(ballWorldMatrix, ...ballTranslation);
 
   	if (playing) { 
       animationTimeSum += deltaTime;
@@ -175,14 +183,14 @@ async function main() {
 
     then = time;
 
-    var curveNum = Math.floor(controls.t);
+    let curveNum = Math.floor(controls.t);
     if(curveNum >= numCurves) curveNum = numCurves - 1;
 
     //let cameraPosition = [0, 100, 100];
     let cameraPosition = [controls.cameraX, controls.cameraY, controls.cameraZ];
     let cameraTarget = [ballWorldMatrix[12], ballWorldMatrix[13], ballWorldMatrix[14]];
-    /* var cameraPosition = curves[curveNum](controls.t);
-    var cameraTarget = curves[curveNum](controls.t + 0.01); */
+    /* let cameraPosition = curves[curveNum](controls.t);
+    let cameraTarget = curves[curveNum](controls.t + 0.01); */
     
     twgl.resizeCanvasToDisplaySize(gl.canvas);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -208,7 +216,10 @@ async function main() {
       u_view: view,
       u_projection: projection,
       u_viewWorldPosition: cameraPosition,
-      u_lightWorldPosition: ballWorldMatrix.slice(12, 15)
+      u_lightWorldPosition: ballWorldMatrix.slice(12, 15),
+      u_kc: controls.kc,
+      u_kl: controls.kl,
+      u_kq: controls.kq
     };
 
     drawTerrain(sharedUniforms);

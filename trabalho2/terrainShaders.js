@@ -46,9 +46,12 @@ uniform sampler2D normalMap;
 
 out vec4 outColor;
 // trocar pra uniform 
-const float kc = 0.3;
-const float kl = 0.001;
-const float kq = 0.0001;
+//const float kc = 0.3;
+//const float kl = 0.001;
+//const float kq = 0.0001;
+uniform float u_kc;
+uniform float u_kl;
+uniform float u_kq;
 
 void main() {
   vec3 dx = dFdx(v_worldPosition);
@@ -63,7 +66,7 @@ void main() {
   
   float distance = length(v_surfaceToLight);
   vec3 pointLightDirection = normalize(v_surfaceToLight);
-  float attenuation = 1.0 / (kc + kl * distance + kq * distance * distance);
+  float attenuation = 1.0 / (u_kc + u_kl * distance + u_kq * distance * distance);
   float pointDiffuse = max(dot(normal, pointLightDirection), 0.0);
   
   float light = ambient + pointDiffuse * attenuation + diffuse;

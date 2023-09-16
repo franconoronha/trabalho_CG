@@ -49,4 +49,4 @@ void main() {
 }
 `;
 
-export { simpleFS, simpleVS };
+export { ballFS, ballVS };
