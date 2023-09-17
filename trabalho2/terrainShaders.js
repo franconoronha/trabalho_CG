@@ -11,13 +11,15 @@ uniform mat4 u_view;
 
 uniform vec3 u_viewWorldPosition;
 uniform vec3 u_lightWorldPosition;
-
+uniform float u_lightPositionArray[6];
 uniform sampler2D displacementMap;
 
 out vec2 v_texcoord;
 out vec3 v_surfaceToLight;
 out vec3 v_surfaceToView;
 out vec3 v_worldPosition;
+out float v_surfaceToLightArray[6];
+
 void main() {
   float displacementScale = 40.0;
   float displacement = texture(displacementMap, a_texcoord).r * displacementScale;
@@ -27,7 +29,13 @@ void main() {
   
   v_texcoord = a_texcoord;
   vec3 surfaceWorldPosition = (u_world * displaced_position).xyz;
-  v_surfaceToLight = u_lightWorldPosition - surfaceWorldPosition;
+
+  for(int i = 0; i < 6; i += 3) {
+    v_surfaceToLightArray[i] = u_lightPositionArray[i] - surfaceWorldPosition.x;
+    v_surfaceToLightArray[i + 1] = u_lightPositionArray[i + 1] - surfaceWorldPosition.y;
+    v_surfaceToLightArray[i + 2] = u_lightPositionArray[i + 2] - surfaceWorldPosition.z;
+  }
+
   v_surfaceToView = u_viewWorldPosition - surfaceWorldPosition;
   v_worldPosition = surfaceWorldPosition;
 }
@@ -37,15 +45,16 @@ const terrainFS = `#version 300 es
 precision highp float;
 
 in vec3 v_surfaceToView;
-in vec3 v_surfaceToLight;
+in float v_surfaceToLightArray[6];
 in vec3 v_worldPosition;
 in vec2 v_texcoord;
 
 uniform vec3 u_lightDirection;
 uniform sampler2D normalMap;
+uniform sampler2D groundTexture;
 
 out vec4 outColor;
-// trocar pra uniform 
+
 //const float kc = 0.3;
 //const float kl = 0.001;
 //const float kq = 0.0001;
@@ -58,20 +67,25 @@ void main() {
   vec3 dy = dFdy(v_worldPosition);
   vec3 normal = normalize(cross(dx, dy));
   //vec3 normal = normalize(texture(normalMap, v_texcoord).rgb * 2. - 1.);
-  vec3 lightDirection = normalize(u_lightDirection);
-  vec3 color = vec3(0.0, 1.0, 0.0);
+  
+  //vec3 color = vec3(0.0, 1.0, 0.0);
+  vec3 color = texture(groundTexture, v_texcoord).rgb;
 
-  float ambient = 0.0;
+  float ambient = 0.1;
+  vec3 lightDirection = normalize(u_lightDirection);
   float diffuse = max(dot(normal, lightDirection), 0.0);
   
-  float distance = length(v_surfaceToLight);
-  vec3 pointLightDirection = normalize(v_surfaceToLight);
-  float attenuation = 1.0 / (u_kc + u_kl * distance + u_kq * distance * distance);
-  float pointDiffuse = max(dot(normal, pointLightDirection), 0.0);
-  
-  float light = ambient + pointDiffuse * attenuation + diffuse;
-  //float light = ambient + pointDiffuse * attenuation;
-  //float light = ambient + diffuse;
+  for (int i = 0; i < 6; i += 3) {
+    vec3 surfaceToLight = vec3(v_surfaceToLightArray[i], v_surfaceToLightArray[i + 1], v_surfaceToLightArray[i + 2]); 
+    float distance = length(surfaceToLight);
+    vec3 pointLightDirection = normalize(surfaceToLight);
+    float attenuation = 1.0 / (u_kc + u_kl * distance + u_kq * distance * distance);
+    float pointDiffuse = max(dot(normal, pointLightDirection), 0.0);
+    diffuse += pointDiffuse * attenuation;
+  }
+
+  float light = ambient + diffuse;
+
   outColor = vec4(color * light, 1.0);
 }
 `;

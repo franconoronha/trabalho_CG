@@ -69,9 +69,9 @@ async function main() {
     this.cameraX = -300;
     this.cameraY = 100;
     this.cameraZ = 300;
-    this.kc = 0.3;
-    this.kl = 0.001;
-    this.kq = 0.0001;
+    this.kc = 0.25;
+    this.kl = 0.0001;
+    this.kq = 0.00005;
   }
 
   let gui = new dat.GUI();
@@ -104,9 +104,9 @@ async function main() {
   lightFolder.add(controls, 'lightz', -10, 10);
 
   let cameraFolder = gui.addFolder("Camera");
-  cameraFolder.add(controls, 'cameraX', -200, 300);
-  cameraFolder.add(controls, 'cameraY', 0, 300);
-  cameraFolder.add(controls, 'cameraZ', -200, 300);
+  cameraFolder.add(controls, 'cameraX', -500, 500);
+  cameraFolder.add(controls, 'cameraY', 0, 500);
+  cameraFolder.add(controls, 'cameraZ', -500, 500);
 
   let attenuationFolder = gui.addFolder("Attenuation");
   attenuationFolder.add(controls, 'kc', -2, 2);
@@ -116,18 +116,27 @@ async function main() {
   const terrainProgramInfo = twgl.createProgramInfo(gl, [terrainVS, terrainFS]);
   const ballProgramInfo = twgl.createProgramInfo(gl, [ballVS, ballFS]);
 
-  //let balls = [];
   let ball = twgl.primitives.createSphereBufferInfo(gl, 5, 64, 64);
   let ballWorldMatrix = m4.translation(-100, 30, 200);
+  let ball2WorldMatrix = m4.translation(-70, 30, 170);
+
+  let balls = [ballWorldMatrix, ball2WorldMatrix];
 
   function drawBalls(sharedUniforms) {
     gl.useProgram(ballProgramInfo.program);
     twgl.setBuffersAndAttributes(gl, ballProgramInfo, ball);
-    twgl.setUniforms(ballProgramInfo, {
+    twgl.setUniforms(ballProgramInfo, sharedUniforms);
+
+    /* twgl.setUniforms(ballProgramInfo, {
       u_world : ballWorldMatrix,
     });
-    twgl.setUniforms(ballProgramInfo, sharedUniforms);
-    twgl.drawBufferInfo(gl, ball);
+    twgl.drawBufferInfo(gl, ball); */
+    for(let ballLocation of balls) {
+      twgl.setUniforms(ballProgramInfo, {
+        u_world : ballLocation,
+      });
+      twgl.drawBufferInfo(gl, ball);
+    }
   }
 
   const terrainBufferInfo = twgl.primitives.createPlaneBufferInfo(
@@ -150,6 +159,12 @@ async function main() {
     wrap: gl.CLAMP_TO_EDGE,
   });
 
+  const groundTexture = twgl.createTexture(gl, {
+    src: './models/ground.png',
+    minMag: gl.NEAREST,
+    wrap: gl.CLAMP_TO_EDGE,
+  });
+
   let terrain_worldMatrix = m4.identity();
 
   function drawTerrain(sharedUniforms) {
@@ -159,7 +174,8 @@ async function main() {
     twgl.setUniformsAndBindTextures(terrainProgramInfo, {
       u_world : terrain_worldMatrix,
       displacementMap: heightMapTexture,
-      normalMap : normalMapTexture
+      normalMap : normalMapTexture,
+      groundTexture : groundTexture
     });
     twgl.drawBufferInfo(gl, terrainBufferInfo);
   }
@@ -170,7 +186,7 @@ async function main() {
     time *= 0.001;  // convert to seconds
     let deltaTime = time - then;
     ballTranslation[0] += deltaTime;
-    ballWorldMatrix = m4.translate(ballWorldMatrix, ...ballTranslation);
+    balls[0] = m4.translate(balls[0], ...ballTranslation);
 
   	if (playing) { 
       animationTimeSum += deltaTime;
@@ -210,13 +226,16 @@ async function main() {
 
     // Make a view matrix from the camera matrix.
     const view = m4.inverse(camera);
+    let u_lightPositionArray = [balls[0][12], balls[0][13], balls[0][14],
+                                balls[1][12], balls[1][13], balls[1][14]];
 
     const sharedUniforms = {
       u_lightDirection: m4.normalize([controls.lightx, controls.lighty, controls.lightz]),
       u_view: view,
       u_projection: projection,
       u_viewWorldPosition: cameraPosition,
-      u_lightWorldPosition: ballWorldMatrix.slice(12, 15),
+      u_lightWorldPosition: balls[0].slice(12, 15),
+      u_lightPositionArray,
       u_kc: controls.kc,
       u_kl: controls.kl,
       u_kq: controls.kq
