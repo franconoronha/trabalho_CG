@@ -10,22 +10,22 @@ async function main() {
   const gl = canvas.getContext("webgl2");
   if (!gl) { return; }
 
-  // Tell the twgl to match position with a_position etc..
   twgl.setAttributePrefix("a_");
-  // compiles and links the shaders, looks up attribute and uniform locations
   const meshProgramInfo = twgl.createProgramInfo(gl, [vs, fs]);
 
   /* let [casaObj, casaMaterials] = await loadObjMtl("casa"); */
 
   let allModels = [];
   const zNear = 10;
-  const zFar = 1000;
+  const zFar = 2000;
 
-  let degToRad = (deg) => deg * Math.PI / 180;
+  const degToRad = (deg) => deg * Math.PI / 180;
 
-  let pointSum = (A, B) => [A[0] + B[0], A[1] + B[1], A[2] + B[2]];
+  const pointSum = (A, B) => [A[0] + B[0], A[1] + B[1], A[2] + B[2]];
 
-  let pointMultiplyScalar = (A, s) => [A[0] * s, A[1] * s, A[2] * s];
+  const pointMultiplyScalar = (A, s) => [A[0] * s, A[1] * s, A[2] * s];
+
+  const subtractVector2 = (a, b) => a.map((v, ndx) => v - b[ndx]);
 
   let pointA = [0, 100, 0];
   let pointB = [0, 0, 0];
@@ -51,10 +51,14 @@ async function main() {
 		return pointSum(firstTerm, pointSum(secondTerm, pointSum(thirdTerm, fourthTerm)));
 	}
 
+  let cameraPosition = [0, 100, 0];
+  let cameraTarget = [0, 30, 0];
+
   let curves = [(t) => bezierCurve(pointA, pointB, pointC1, pointC2, t, 0),
                 (t) => bezierCurve(pointB, pointC, pointC3, pointC4, t, 1),
                 (t) => bezierCurve(pointC, pointD, pointC5, pointC6, t, 2),
-                (t) => bezierCurve(pointD, pointE, pointC7, pointC8, t, 3)];
+                (t) => bezierCurve(pointD, pointE, pointC7, pointC8, t, 3)
+  ];
 
   let then = 0;
   let animationTimeSum = 0;
@@ -116,26 +120,56 @@ async function main() {
   const terrainProgramInfo = twgl.createProgramInfo(gl, [terrainVS, terrainFS]);
   const ballProgramInfo = twgl.createProgramInfo(gl, [ballVS, ballFS]);
 
-  let ball = twgl.primitives.createSphereBufferInfo(gl, 5, 64, 64);
-  let ballWorldMatrix = m4.translation(-100, 30, 200);
-  let ball2WorldMatrix = m4.translation(-70, 30, 170);
+  let ballBufferInfo = twgl.primitives.createSphereBufferInfo(gl, 5, 64, 64);
 
-  let balls = [ballWorldMatrix, ball2WorldMatrix];
+  function createBallObj(worldMatrix, direction) {
+    if(!worldMatrix) {
+      worldMatrix = [0, 0, 0];
+      direction = [0, 0, 0]
+    }
+    return {
+      worldMatrix: m4.translation(...worldMatrix),
+      direction: m4.normalize(subtractVector2(direction, worldMatrix))
+    }
+  }
+
+  let balls = [
+    createBallObj(null, null),
+    createBallObj(null, null),
+    createBallObj(null, null),
+    createBallObj(null, null),
+    createBallObj(null, null),
+  ];
+
+  const maxBalls = 5;
+  let activeBalls = 0;
+
+  function addBall() {
+    if (activeBalls < maxBalls) {
+      balls[activeBalls] = createBallObj(cameraPosition, cameraTarget);
+      activeBalls++;
+    } else {
+      balls.shift();
+      balls.push(createBallObj(cameraPosition, cameraTarget));
+    }
+  }
+
+  document.addEventListener('keyup', event => {
+    if (event.code === 'Space') {
+      addBall();
+    }
+  });
 
   function drawBalls(sharedUniforms) {
     gl.useProgram(ballProgramInfo.program);
-    twgl.setBuffersAndAttributes(gl, ballProgramInfo, ball);
+    twgl.setBuffersAndAttributes(gl, ballProgramInfo, ballBufferInfo);
     twgl.setUniforms(ballProgramInfo, sharedUniforms);
 
-    /* twgl.setUniforms(ballProgramInfo, {
-      u_world : ballWorldMatrix,
-    });
-    twgl.drawBufferInfo(gl, ball); */
-    for(let ballLocation of balls) {
+    for(let i = 0; i < activeBalls; i++) {
       twgl.setUniforms(ballProgramInfo, {
-        u_world : ballLocation,
+        u_world : balls[i].worldMatrix
       });
-      twgl.drawBufferInfo(gl, ball);
+      twgl.drawBufferInfo(gl, ballBufferInfo);
     }
   }
 
@@ -153,11 +187,11 @@ async function main() {
     wrap: gl.CLAMP_TO_EDGE,
   });
 
-  const normalMapTexture = twgl.createTexture(gl, {
+/*   const normalMapTexture = twgl.createTexture(gl, {
     src: './models/normalMap_3.png',
     minMag: gl.NEAREST,
     wrap: gl.CLAMP_TO_EDGE,
-  });
+  }); */
 
   const groundTexture = twgl.createTexture(gl, {
     src: './models/ground.png',
@@ -174,7 +208,7 @@ async function main() {
     twgl.setUniformsAndBindTextures(terrainProgramInfo, {
       u_world : terrain_worldMatrix,
       displacementMap: heightMapTexture,
-      normalMap : normalMapTexture,
+      /* normalMap : normalMapTexture, */
       groundTexture : groundTexture
     });
     twgl.drawBufferInfo(gl, terrainBufferInfo);
@@ -186,7 +220,7 @@ async function main() {
     time *= 0.001;  // convert to seconds
     let deltaTime = time - then;
     ballTranslation[0] += deltaTime;
-    balls[0] = m4.translate(balls[0], ...ballTranslation);
+    //balls[0] = m4.translate(balls[0], ...ballTranslation);
 
   	if (playing) { 
       animationTimeSum += deltaTime;
@@ -203,8 +237,16 @@ async function main() {
     if(curveNum >= numCurves) curveNum = numCurves - 1;
 
     //let cameraPosition = [0, 100, 100];
-    let cameraPosition = [controls.cameraX, controls.cameraY, controls.cameraZ];
-    let cameraTarget = [ballWorldMatrix[12], ballWorldMatrix[13], ballWorldMatrix[14]];
+    cameraPosition = [controls.cameraX, controls.cameraY, controls.cameraZ];
+    //let cameraTarget = [ballWorldMatrix[12], ballWorldMatrix[13], ballWorldMatrix[14]];
+    //let cameraTarget = balls[0].slice(12, 15);
+    cameraTarget = [-299, 100, 300];
+
+    for(let i = 0; i < activeBalls; i++) {
+      let speed = 2;
+      let movement = pointMultiplyScalar(balls[i].direction, speed);
+      balls[i].worldMatrix = m4.translate(balls[i].worldMatrix, ...movement);
+    }
     /* let cameraPosition = curves[curveNum](controls.t);
     let cameraTarget = curves[curveNum](controls.t + 0.01); */
     
@@ -213,7 +255,7 @@ async function main() {
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
 
-    gl.clearColor(1, 1, 1, 1);
+    gl.clearColor(0.1, 0.1, 0.1, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     const fieldOfViewRadians = degToRad(60);
@@ -226,16 +268,19 @@ async function main() {
 
     // Make a view matrix from the camera matrix.
     const view = m4.inverse(camera);
-    let u_lightPositionArray = [balls[0][12], balls[0][13], balls[0][14],
-                                balls[1][12], balls[1][13], balls[1][14]];
+
+    let u_lightPositionArray = [];
+    for(let ball of balls) {
+      u_lightPositionArray.push(...ball.worldMatrix.slice(12, 15));
+    }
 
     const sharedUniforms = {
       u_lightDirection: m4.normalize([controls.lightx, controls.lighty, controls.lightz]),
       u_view: view,
       u_projection: projection,
       u_viewWorldPosition: cameraPosition,
-      u_lightWorldPosition: balls[0].slice(12, 15),
       u_lightPositionArray,
+      u_activeBalls: activeBalls,
       u_kc: controls.kc,
       u_kl: controls.kl,
       u_kq: controls.kq
@@ -245,10 +290,8 @@ async function main() {
     drawBalls(sharedUniforms);
 
     gl.useProgram(meshProgramInfo.program);
-
-    // calls gl.uniform
     twgl.setUniforms(meshProgramInfo, sharedUniforms);
-    /* twgl.setUniforms(meshProgramInfo2, sharedUniforms); */
+
     allModels.forEach(model => {
       for (const {bufferInfo, vao, material} of model) {
         let u_world = model.worldMatrix;

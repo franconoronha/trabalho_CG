@@ -10,15 +10,16 @@ uniform mat4 u_projection;
 uniform mat4 u_view;
 
 uniform vec3 u_viewWorldPosition;
-uniform vec3 u_lightWorldPosition;
-uniform float u_lightPositionArray[6];
+uniform float u_lightPositionArray[15];
 uniform sampler2D displacementMap;
 
 out vec2 v_texcoord;
 out vec3 v_surfaceToLight;
 out vec3 v_surfaceToView;
 out vec3 v_worldPosition;
-out float v_surfaceToLightArray[6];
+out vec3 v_surfaceToLightArray[5];
+
+/* uniform int u_activeBalls; */
 
 void main() {
   float displacementScale = 40.0;
@@ -30,10 +31,8 @@ void main() {
   v_texcoord = a_texcoord;
   vec3 surfaceWorldPosition = (u_world * displaced_position).xyz;
 
-  for(int i = 0; i < 6; i += 3) {
-    v_surfaceToLightArray[i] = u_lightPositionArray[i] - surfaceWorldPosition.x;
-    v_surfaceToLightArray[i + 1] = u_lightPositionArray[i + 1] - surfaceWorldPosition.y;
-    v_surfaceToLightArray[i + 2] = u_lightPositionArray[i + 2] - surfaceWorldPosition.z;
+  for(int i = 0; i < 5; i++) {
+    v_surfaceToLightArray[i] = vec3(u_lightPositionArray[i * 3] - surfaceWorldPosition.x, u_lightPositionArray[i * 3 + 1] - surfaceWorldPosition.y, u_lightPositionArray[i * 3 + 2] - surfaceWorldPosition.z);
   }
 
   v_surfaceToView = u_viewWorldPosition - surfaceWorldPosition;
@@ -45,7 +44,7 @@ const terrainFS = `#version 300 es
 precision highp float;
 
 in vec3 v_surfaceToView;
-in float v_surfaceToLightArray[6];
+in vec3 v_surfaceToLightArray[5];
 in vec3 v_worldPosition;
 in vec2 v_texcoord;
 
@@ -62,6 +61,8 @@ uniform float u_kc;
 uniform float u_kl;
 uniform float u_kq;
 
+uniform int u_activeBalls;
+
 void main() {
   vec3 dx = dFdx(v_worldPosition);
   vec3 dy = dFdy(v_worldPosition);
@@ -75,10 +76,9 @@ void main() {
   vec3 lightDirection = normalize(u_lightDirection);
   float diffuse = max(dot(normal, lightDirection), 0.0);
   
-  for (int i = 0; i < 6; i += 3) {
-    vec3 surfaceToLight = vec3(v_surfaceToLightArray[i], v_surfaceToLightArray[i + 1], v_surfaceToLightArray[i + 2]); 
-    float distance = length(surfaceToLight);
-    vec3 pointLightDirection = normalize(surfaceToLight);
+  for (int i = 0; i < u_activeBalls; i++) {
+    float distance = length(v_surfaceToLightArray[i]);
+    vec3 pointLightDirection = normalize(v_surfaceToLightArray[i]);
     float attenuation = 1.0 / (u_kc + u_kl * distance + u_kq * distance * distance);
     float pointDiffuse = max(dot(normal, pointLightDirection), 0.0);
     diffuse += pointDiffuse * attenuation;
