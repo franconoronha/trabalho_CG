@@ -401,7 +401,7 @@ async function main() {
         .forEach(([key, filename]) => {
           let texture = textures[filename];
           if (!texture) {
-            texture = twgl.createTexture(gl, {src: "/models/" + filename, flipY: true});
+            texture = twgl.createTexture(gl, {src: "trabalho1/models/" + filename, flipY: true});
             textures[filename] = texture;
           }
           material[key] = texture;

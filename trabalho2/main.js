@@ -1,8 +1,26 @@
 "use strict";
 
-import { terrainVS, terrainFS } from "./terrainShaders.js";
-import { ballVS, ballFS } from "./ballShader.js";
-import { vs, fs } from "./objShaders.js"
+import { terrainVS, terrainFS } from "./shaders/terrainShaders.js";
+import { ballVS, ballFS } from "./shaders/ballShader.js";
+import { vs, fs } from "./shaders/objShaders.js";
+import objLoader from './objLoader.js';
+
+const degToRad = (deg) => deg * Math.PI / 180;
+
+const pointSum = (A, B) => [A[0] + B[0], A[1] + B[1], A[2] + B[2]];
+
+const pointMultiplyScalar = (A, s) => [A[0] * s, A[1] * s, A[2] * s];
+
+const subtractVector2 = (a, b) => a.map((v, ndx) => v - b[ndx]);
+
+// (1-t)^(3)A + 3t(1-t)^(2)c1 + 3t^(2)(1-t)c2 + t^(3)B
+function bezierCurve(A, B, c1, c2, t, i) {
+  let firstTerm = pointMultiplyScalar(A, (1 - t + i) ** 3);
+  let secondTerm = pointMultiplyScalar(c1, 3 * ((1 - t + i) ** 2) * (t - i));
+  let thirdTerm = pointMultiplyScalar(c2, 3 * (1 - t + i) * ((t - i) ** 2));
+  let fourthTerm = pointMultiplyScalar(B, (t - i) ** 3);
+  return pointSum(firstTerm, pointSum(secondTerm, pointSum(thirdTerm, fourthTerm)));
+}
 
 async function main() {
   /** @type {HTMLCanvasElement} */
@@ -12,20 +30,17 @@ async function main() {
 
   twgl.setAttributePrefix("a_");
   const meshProgramInfo = twgl.createProgramInfo(gl, [vs, fs]);
+  
+  const loader = new objLoader(gl, twgl);
+  let [fishObj, fishMaterials] = await loader.loadObjMtl("fish");
+  loader.loadTextures(fishObj, fishMaterials, "fish_texture.png");
+  var fishModel = loader.objPrep(fishObj, meshProgramInfo);
 
-  /* let [casaObj, casaMaterials] = await loadObjMtl("casa"); */
+  console.log(fishModel);
 
   let allModels = [];
   const zNear = 10;
   const zFar = 2000;
-
-  const degToRad = (deg) => deg * Math.PI / 180;
-
-  const pointSum = (A, B) => [A[0] + B[0], A[1] + B[1], A[2] + B[2]];
-
-  const pointMultiplyScalar = (A, s) => [A[0] * s, A[1] * s, A[2] * s];
-
-  const subtractVector2 = (a, b) => a.map((v, ndx) => v - b[ndx]);
 
   let pointA = [0, 100, 0];
   let pointB = [0, 0, 0];
@@ -41,15 +56,6 @@ async function main() {
   let pointC6 = [-13.409, 10, 27.935];
   let pointC7 = [49.426, 10, 26.056];
   let pointC8 = [72.852, 10, 26.174];
-
-  // (1-t)^(3)A + 3t(1-t)^(2)c1 + 3t^(2)(1-t)c2 + t^(3)B
-	function bezierCurve(A, B, c1, c2, t, i) {
-		let firstTerm = pointMultiplyScalar(A, (1 - t + i) ** 3);
-		let secondTerm = pointMultiplyScalar(c1, 3 * ((1 - t + i) ** 2) * (t - i));
-		let thirdTerm = pointMultiplyScalar(c2, 3 * (1 - t + i) * ((t - i) ** 2));
-		let fourthTerm = pointMultiplyScalar(B, (t - i) ** 3);
-		return pointSum(firstTerm, pointSum(secondTerm, pointSum(thirdTerm, fourthTerm)));
-	}
 
   let cameraPosition = [0, 100, 0];
   let cameraTarget = [0, 30, 0];
@@ -120,7 +126,8 @@ async function main() {
   const terrainProgramInfo = twgl.createProgramInfo(gl, [terrainVS, terrainFS]);
   const ballProgramInfo = twgl.createProgramInfo(gl, [ballVS, ballFS]);
 
-  let ballBufferInfo = twgl.primitives.createSphereBufferInfo(gl, 5, 64, 64);
+  const radius = 5;
+  let ballBufferInfo = twgl.primitives.createSphereBufferInfo(gl, radius, 64, 64);
 
   function createBallObj(worldMatrix, direction) {
     if(!worldMatrix) {
@@ -182,13 +189,13 @@ async function main() {
 );
   
   const heightMapTexture = twgl.createTexture(gl, {
-    src: './models/heightmap_3.png',
+    src: './models/heightmap.png',
     minMag: gl.NEAREST,
     wrap: gl.CLAMP_TO_EDGE,
   });
 
 /*   const normalMapTexture = twgl.createTexture(gl, {
-    src: './models/normalMap_3.png',
+    src: './models/normalMap.png',
     minMag: gl.NEAREST,
     wrap: gl.CLAMP_TO_EDGE,
   }); */
@@ -208,7 +215,6 @@ async function main() {
     twgl.setUniformsAndBindTextures(terrainProgramInfo, {
       u_world : terrain_worldMatrix,
       displacementMap: heightMapTexture,
-      /* normalMap : normalMapTexture, */
       groundTexture : groundTexture
     });
     twgl.drawBufferInfo(gl, terrainBufferInfo);
@@ -243,7 +249,7 @@ async function main() {
     cameraTarget = [-299, 100, 300];
 
     for(let i = 0; i < activeBalls; i++) {
-      let speed = 2;
+      let speed = 5;
       let movement = pointMultiplyScalar(balls[i].direction, speed);
       balls[i].worldMatrix = m4.translate(balls[i].worldMatrix, ...movement);
     }
@@ -255,7 +261,7 @@ async function main() {
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
 
-    gl.clearColor(0.1, 0.1, 0.1, 1);
+    gl.clearColor(0.5, 0.5, 0.5, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     const fieldOfViewRadians = degToRad(60);
