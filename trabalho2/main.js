@@ -208,7 +208,7 @@ async function main() {
     240,  // quads across
     240,  // quads down
   );
-  
+  console.log(terrainBufferInfo);
   const planeBufferInfo = twgl.primitives.createPlaneBufferInfo(gl, 5000, 5000, 1, 1);
   const quadBufferInfo = twgl.primitives.createXYQuadBufferInfo(gl); 
   const quadVAO = twgl.createVAOFromBufferInfo(gl, skyboxProgramInfo, quadBufferInfo);
@@ -228,12 +228,12 @@ async function main() {
   const skyboxTexture = twgl.createTexture(gl, {
     target: gl.TEXTURE_CUBE_MAP,
     src: [
-      "./models/Box_Front.bmp",
-      "./models/Box_Back.bmp",
+      "./models/Box_Right.bmp",
+      "./models/Box_Left.bmp",
       "./models/Box_Top.bmp",
       "./models/Box_Bottom.bmp",
-      "./models/Box_Left.bmp",
-      "./models/Box_Right.bmp",
+      "./models/Box_Front.bmp",
+      "./models/Box_Back.bmp",
     ],
     min: gl.LINEAR_MIPMAP_LINEAR
   });
