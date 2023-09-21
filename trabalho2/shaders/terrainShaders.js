@@ -14,13 +14,12 @@ uniform float u_lightPositionArray[15];
 uniform sampler2D displacementMap;
 
 out vec2 v_texcoord;
-out vec3 v_surfaceToLight;
 out vec3 v_surfaceToView;
 out vec3 v_worldPosition;
 out vec3 v_surfaceToLightArray[5];
 
 void main() {
-  float displacementScale = 40.0;
+  float displacementScale = 200.0;
   float displacement = texture(displacementMap, a_texcoord).r * displacementScale;
   vec4 displaced_position = a_position + vec4(0, displacement, 0, 0);
 
@@ -50,6 +49,11 @@ in vec2 v_texcoord;
 uniform vec3 u_lightDirection;
 uniform sampler2D normalMap;
 uniform sampler2D groundTexture;
+uniform sampler2D displacementNormalMap;
+uniform float u_kc;
+uniform float u_kl;
+uniform float u_kq;
+uniform int u_activeBalls;
 
 out vec4 outColor;
 
@@ -57,17 +61,13 @@ out vec4 outColor;
 //const float kl = 0.001;
 //const float kq = 0.0001;
 const float shininess = 5000.0;
-uniform float u_kc;
-uniform float u_kl;
-uniform float u_kq;
-
-uniform int u_activeBalls;
 
 void main() {
   vec3 dx = dFdx(v_worldPosition);
   vec3 dy = dFdy(v_worldPosition);
   vec3 normal = normalize(cross(dx, dy));
-  
+  //vec3 normal = normalize(texture(normalMap, v_texcoord).rgb);
+  //vec3 normal = texture(displacementNormalMap, v_texcoord).rgb; 
   vec3 color = texture(groundTexture, v_texcoord).rgb;
 
   float ambient = 0.1;

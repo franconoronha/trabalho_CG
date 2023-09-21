@@ -4,7 +4,12 @@ function parseOBJ(text) {
   const objTexcoords = [[0, 0]];
   const objNormals = [[0, 0, 0]];
   const objColors = [[0, 0, 0]];
-
+  let minX = 9999;
+  let minY = 9999;
+  let minZ = 9999;
+  let maxX = -9999;
+  let maxY = -9999;
+  let maxZ = -9999;
   // same order as `f` indices
   const objVertexData = [
     objPositions,
@@ -89,6 +94,15 @@ function parseOBJ(text) {
         objPositions.push(parts.slice(0, 3).map(parseFloat));
         objColors.push(parts.slice(3).map(parseFloat));
       } else {
+        let x = parseFloat(parts[0]);
+        let y = parseFloat(parts[1]);
+        let z = parseFloat(parts[2]);
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (z < minZ) minZ = z;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+        if (z > maxZ) maxZ = z;
         objPositions.push(parts.map(parseFloat));
       }
     },
@@ -158,6 +172,14 @@ function parseOBJ(text) {
   return {
     geometries,
     materialLibs,
+    bounds: {
+      minX,
+      minY,
+      minZ,
+      maxX,
+      maxY,
+      maxZ,
+    },
   };
 }
   
@@ -298,31 +320,31 @@ export default class objLoader {
           data.color = { numComponents: 3, data: data.color };
       }
       } else {
-      // there are no vertex colors so just use constant white
-      data.color = { value: [1, 1, 1, 1] };
+        // there are no vertex colors so just use constant white
+        data.color = { value: [1, 1, 1, 1] };
       }
   
       // generate tangents if we have the data to do so.
       if (data.texcoord && data.normal) {
-      data.tangent = generateTangents(data.position, data.texcoord);
+        data.tangent = generateTangents(data.position, data.texcoord);
       } else {
-      // There are no tangents
-      data.tangent = { value: [1, 0, 0] };
+        // There are no tangents
+        data.tangent = { value: [1, 0, 0] };
       }
   
       if (!data.texcoord) {
-      data.texcoord = { value: [0, 0] };
+        data.texcoord = { value: [0, 0] };
       }
   
       if (!data.normal) {
-      // we probably want to generate normals if there are none
-      data.normal = { value: [0, 0, 1] };
+        // we probably want to generate normals if there are none
+        data.normal = { value: [0, 0, 1] };
       }
   
       // create a buffer for each array by calling
       // gl.createBuffer, gl.bindBuffer, gl.bufferData
-      const bufferInfo = twgl.createBufferInfoFromArrays(this.gl, data);
-      const vao = twgl.createVAOFromBufferInfo(this.gl, program, bufferInfo);
+      const bufferInfo = this.twgl.createBufferInfoFromArrays(this.gl, data);
+      const vao = this.twgl.createVAOFromBufferInfo(this.gl, program, bufferInfo);
   
       return {
           material: {
@@ -337,7 +359,7 @@ export default class objLoader {
     return parts;
   }
   
-  loadTextures(obj, materials, path) {
+  loadTextures(obj, materials) {
     // load texture for materials
     for (const material of Object.values(materials)) {
       Object.entries(material)
@@ -345,7 +367,7 @@ export default class objLoader {
         .forEach(([key, filename]) => {
           let texture = this.textures[filename];
           if (!texture) {
-            texture = twgl.createTexture(this.gl, {src: "/trabalho2/models/" + filename, flipY: true});
+            texture = this.twgl.createTexture(this.gl, {src: "/trabalho2/models/" + filename, flipY: true});
             this.textures[filename] = texture;
           }
           material[key] = texture;
@@ -355,13 +377,19 @@ export default class objLoader {
     obj.materials = materials;
   }
   
-  async loadObjMtl(path) {
+  async loadObjMtl(path, program) {
       let responseObj = await fetch("./models/" + path + ".obj");
       let textObj = await responseObj.text();
       let obj = parseOBJ(textObj);
       let responseMtl = await fetch("./models/" + path + ".mtl");
       let textMtl = await responseMtl.text();
       let materials = parseMTL(textMtl);
-      return [obj, materials];
+
+      this.loadTextures(obj, materials);
+      let model = this.objPrep(obj, program);
+      model.bounds = obj.bounds;
+      return model;
   }
+
+  
 }
