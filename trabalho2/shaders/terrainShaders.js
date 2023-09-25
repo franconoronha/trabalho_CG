@@ -3,6 +3,7 @@
 const terrainVS = `#version 300 es
 
 in vec4 a_position;
+in vec3 a_normal;
 in vec2 a_texcoord;
 
 uniform mat4 u_world;
@@ -17,24 +18,26 @@ out vec2 v_texcoord;
 out vec3 v_surfaceToView;
 out vec3 v_worldPosition;
 out vec3 v_surfaceToLightArray[5];
+out vec3 v_normal;
 
 void main() {
   float displacementScale = 200.0;
   float displacement = texture(displacementMap, a_texcoord).r * displacementScale;
   vec4 displaced_position = a_position + vec4(0, displacement, 0, 0);
+  //vec4 displaced_position = a_position;
 
   gl_Position =  u_projection * u_view * u_world * displaced_position;
   
-  v_texcoord = a_texcoord;
   vec3 surfaceWorldPosition = (u_world * displaced_position).xyz;
-
+  
   for(int i = 0; i < 5; i++) {
     v_surfaceToLightArray[i] = vec3(u_lightPositionArray[i * 3] - surfaceWorldPosition.x, u_lightPositionArray[i * 3 + 1] - surfaceWorldPosition.y, u_lightPositionArray[i * 3 + 2] - surfaceWorldPosition.z);
-    //v_surfaceToLightArray[i] = normalize(v_surfaceToLightArray[i]);
   }
-
+  
   v_surfaceToView = u_viewWorldPosition - surfaceWorldPosition;
   v_worldPosition = surfaceWorldPosition;
+  v_normal = a_normal;
+  v_texcoord = a_texcoord;
 }
 `;
 
@@ -43,13 +46,13 @@ precision highp float;
 
 in vec3 v_surfaceToView;
 in vec3 v_surfaceToLightArray[5];
-in vec3 v_worldPosition;
 in vec2 v_texcoord;
+in vec3 v_normal;
+
+in vec3 v_worldPosition;
 
 uniform vec3 u_lightDirection;
-uniform sampler2D normalMap;
 uniform sampler2D groundTexture;
-uniform sampler2D displacementNormalMap;
 uniform float u_kc;
 uniform float u_kl;
 uniform float u_kq;
@@ -65,9 +68,9 @@ const float shininess = 5000.0;
 void main() {
   vec3 dx = dFdx(v_worldPosition);
   vec3 dy = dFdy(v_worldPosition);
-  vec3 normal = normalize(cross(dx, dy));
-  //vec3 normal = normalize(texture(normalMap, v_texcoord).rgb);
-  //vec3 normal = texture(displacementNormalMap, v_texcoord).rgb; 
+  //vec3 normal = normalize(cross(dx, dy));
+  vec3 normal = normalize(v_normal);
+
   vec3 color = texture(groundTexture, v_texcoord).rgb;
 
   float ambient = 0.1;

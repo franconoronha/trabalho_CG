@@ -56,7 +56,6 @@ async function main() {
 
   penguinModel.worldMatrix = m4.translation(100, 100, 0);
   penguinModel.worldMatrix = m4.scale(penguinModel.worldMatrix, 10, 10, 10);
-  console.log(penguinModel);
 
   let allModels = [penguinModel];
   const zNear = 10;
@@ -208,10 +207,10 @@ async function main() {
     240,  // quads across
     240,  // quads down
   );
-  console.log(terrainBufferInfo);
+  
   const planeBufferInfo = twgl.primitives.createPlaneBufferInfo(gl, 5000, 5000, 1, 1);
   const quadBufferInfo = twgl.primitives.createXYQuadBufferInfo(gl); 
-  const quadVAO = twgl.createVAOFromBufferInfo(gl, skyboxProgramInfo, quadBufferInfo);
+  
 
   const heightMapTexture = twgl.createTexture(gl, {
     src: './models/ridge-height.png',
@@ -219,10 +218,6 @@ async function main() {
 
   const groundTexture = twgl.createTexture(gl, {
     src: './models/ridge.png',
-  });
-
-  const normalMapTexture = twgl.createTexture(gl, {
-    src: './models/normal2.png',
   });
 
   const skyboxTexture = twgl.createTexture(gl, {
@@ -237,7 +232,6 @@ async function main() {
     ],
     min: gl.LINEAR_MIPMAP_LINEAR
   });
-
   
   // get image data
   const img = await loadImage("./models/ridge-height.png");
@@ -247,55 +241,108 @@ async function main() {
   ctx.drawImage(img, 0, 0);
   const imgData = ctx.getImageData(0, 0, img.width, img.height);
   const v3 = twgl.v3;
-  // generate normals from height data
   const displacementScale = 200;
-  const data = new Uint8Array(imgData.data.length);
-  for (let z = 0; z < imgData.height; ++z) {
-    for (let x = 0; x < imgData.width; ++x) {
-      const off = (z * img.width + x) * 4;
-      const h0 = imgData.data[off];
-      const h1 = imgData.data[off + 4] || 0;  // being lazy at edge
-      const h2 = imgData.data[off + imgData.width * 4] || 0; // being lazy at edge
-      const p0 = [x    , h0 * displacementScale / 255, z    ];
-      const p1 = [x + 1, h1 * displacementScale / 255, z    ];
-      const p2 = [x    , h2 * displacementScale / 255, z + 1];
-      const v0 = v3.normalize(v3.subtract(p1, p0));
-      const v1 = v3.normalize(v3.subtract(p2, p0));
-      const normal = v3.normalize(v3.cross(v0, v1));
-      data[off + 0] = (normal[0] * 0.5 + 0.5) * 255;
-      data[off + 1] = (normal[1] * 0.5 + 0.5) * 255;
-      data[off + 2] = (normal[2] * 0.5 + 0.5) * 255;
-      data[off + 3] = h0;
+
+  const terrainVertices = twgl.primitives.createPlaneVertices(960, 960, 240, 240);
+  let triangles = [];
+  let normals = [];
+  let vertices = [];
+  let texcoords = [];
+  let indicesNormals = [];
+  for(let i = 0; i < terrainVertices.texcoord.length; i += 2) {
+    texcoords.push([terrainVertices.texcoord[i], terrainVertices.texcoord[i + 1]]);
+  }
+  for(let i = 0; i < terrainVertices.indices.length; i += 3) {
+    triangles.push([terrainVertices.indices[i], terrainVertices.indices[i + 1], terrainVertices.indices[i + 2]]);
+  }
+  let sendV = [];
+  for(let i = 0; i < terrainVertices.position.length; i += 3) {
+    let vertexPosition = [terrainVertices.position[i], terrainVertices.position[i + 1], terrainVertices.position[i + 2]];
+    vertices.push(vertexPosition);
+  }
+
+  for(let i = 0; i < vertices.length; i++) {
+    let imgPos = [Math.round(texcoords[i][0] * imgData.width), Math.round(texcoords[i][1] * imgData.height)];
+    if(imgPos[0] >= imgData.width) imgPos[0] = imgData.width - 1;
+    if(imgPos[1] >= imgData.height) imgPos[1] = imgData.height - 1;
+    let height = imgData.data[(imgPos[0] * imgData.width + imgPos[1]) * 4] * displacementScale / 255;
+    vertices[i][1] = height;
+    indicesNormals.push({
+      normal: v3.create(0, 0, 0),
+      count: 0
+    });
+  }
+
+  for(let i = 0; i < vertices.length; i++) {
+    sendV.push(...vertices[i]);
+  }
+
+
+  for(let i = 0; i < triangles.length; i++) {
+    let v0 = vertices[triangles[i][0]];
+    let v1 = vertices[triangles[i][1]];
+    let v2 = vertices[triangles[i][2]];
+    let v01 = v3.subtract(v1, v0);
+    let v02 = v3.subtract(v2, v0);
+    let normal = v3.normalize(v3.cross(v01, v02));
+    normals.push(normal);
+  }
+  console.log(triangles.length);
+  for(let i = 0; i < triangles.length; i++) {
+    indicesNormals[triangles[i][0]].normal = v3.add(normals[i], indicesNormals[triangles[i][0]].normal);
+    indicesNormals[triangles[i][1]].normal = v3.add(normals[i], indicesNormals[triangles[i][1]].normal);
+    indicesNormals[triangles[i][2]].normal = v3.add(normals[i], indicesNormals[triangles[i][2]].normal);
+
+    indicesNormals[triangles[i][0]].count++;
+    indicesNormals[triangles[i][1]].count++;
+    indicesNormals[triangles[i][2]].count++;
+  }
+
+  let averagedNormals = [];
+  for(let i = 0; i < indicesNormals.length; i++) {
+    let average;
+    if(indicesNormals[i].count == 0) {
+      average = [0, 1, 0];
+    } else {
+      average = v3.divScalar(indicesNormals[i].normal, indicesNormals[i].count);
     }
-  }  
+    averagedNormals.push(...v3.normalize(average));
+  }
 
-  const displacementNormalTexture = twgl.createTexture(gl, {
-    src: data,
+  console.log(averagedNormals.length);
+  console.log(terrainVertices.normal.length);
+
+  console.log(sendV.length);
+  let terrainBufferInfo2 = twgl.createBufferInfoFromArrays(gl, {
+    position: terrainVertices.position,
+    normal: averagedNormals,
+    texcoord: terrainVertices.texcoord,
+    indices: terrainVertices.indices
   });
-
+  /* terrainBufferInfo.attribs.a_normal = terrainBufferInfo2.attribs.a_normal;
+  console.log(terrainBufferInfo);
+  console.log(terrainBufferInfo2); */
   let terrain_worldMatrix = m4.identity();
 
   function drawTerrain(sharedUniforms) {
     gl.useProgram(terrainProgramInfo.program);
-    twgl.setBuffersAndAttributes(gl, terrainProgramInfo, terrainBufferInfo);
+    twgl.setBuffersAndAttributes(gl, terrainProgramInfo, terrainBufferInfo2);
     twgl.setUniforms(terrainProgramInfo, sharedUniforms);
     twgl.setUniformsAndBindTextures(terrainProgramInfo, {
       u_world : terrain_worldMatrix,
       displacementMap: heightMapTexture,
       groundTexture : groundTexture,
-      normalMap: normalMapTexture,
-      displacementNormalTexture: displacementNormalTexture
     });
-    twgl.drawBufferInfo(gl, terrainBufferInfo);
+    twgl.drawBufferInfo(gl, terrainBufferInfo2);
 
-    gl.useProgram(planeProgramInfo.program);
+    /* gl.useProgram(planeProgramInfo.program);
     twgl.setBuffersAndAttributes(gl, planeProgramInfo, planeBufferInfo);
     twgl.setUniforms(planeProgramInfo, sharedUniforms);
     twgl.setUniformsAndBindTextures(planeProgramInfo, {
       u_world : terrain_worldMatrix,
       groundTexture : groundTexture
     });
-    twgl.drawBufferInfo(gl, planeBufferInfo);
+    twgl.drawBufferInfo(gl, planeBufferInfo); */
   }
 
   function render(time) {
@@ -340,6 +387,8 @@ async function main() {
         );
         if (distance < radius) {
           allModels.splice(m, 1);
+          balls.splice(i, 1);
+          balls.push(createBallObj(null, null));
         }
       }
     }
@@ -393,7 +442,7 @@ async function main() {
         twgl.setBuffersAndAttributes(gl, birdProgramInfo, bufferInfo);
         let u_world = model.worldMatrix;
         // set the attributes for this part.
-        gl.bindVertexArray(vao);
+        //gl.bindVertexArray(vao);
         // calls gl.uniform
         twgl.setUniforms(birdProgramInfo, {
           u_world,
@@ -402,7 +451,7 @@ async function main() {
         twgl.drawBufferInfo(gl, bufferInfo);
       }
     });
-    //gl.depthFunc(gl.LEQUAL);
+    
     let viewDirection = m4.copy(view);
     viewDirection[12] = 0;
     viewDirection[13] = 0;
