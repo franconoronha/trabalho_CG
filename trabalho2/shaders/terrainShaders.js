@@ -24,7 +24,6 @@ void main() {
   float displacementScale = 200.0;
   float displacement = texture(displacementMap, a_texcoord).r * displacementScale;
   vec4 displaced_position = a_position + vec4(0, displacement, 0, 0);
-  //vec4 displaced_position = a_position;
 
   gl_Position =  u_projection * u_view * u_world * displaced_position;
   
@@ -66,10 +65,7 @@ out vec4 outColor;
 const float shininess = 5000.0;
 
 void main() {
-  vec3 dx = dFdx(v_worldPosition);
-  vec3 dy = dFdy(v_worldPosition);
-  //vec3 normal = normalize(cross(dx, dy));
-  vec3 normal = normalize(v_normal);
+  vec3 normal = v_normal;
 
   vec3 color = texture(groundTexture, v_texcoord).rgb;
 

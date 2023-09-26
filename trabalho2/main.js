@@ -16,6 +16,8 @@ const pointMultiplyScalar = (A, s) => [A[0] * s, A[1] * s, A[2] * s];
 
 const subtractVector2 = (a, b) => a.map((v, ndx) => v - b[ndx]);
 
+const v3 = twgl.v3;
+
 // (1-t)^(3)A + 3t(1-t)^(2)c1 + 3t^(2)(1-t)c2 + t^(3)B
 function bezierCurve(A, B, c1, c2, t, i) {
   let firstTerm = pointMultiplyScalar(A, (1 - t + i) ** 3);
@@ -35,6 +37,19 @@ function loadImage(url) {
   });
 }
 
+function createBallObj(worldMatrix, direction) {
+  if(!worldMatrix) {
+    worldMatrix = [0, 0, 0];
+    direction = [0, 0, 0]
+  }
+  return {
+    worldMatrix: m4.translation(...worldMatrix),
+    direction: m4.normalize(subtractVector2(direction, worldMatrix))
+  }
+}
+
+let randomZ = () => Math.random() * (400 - (-400)) + (-400);
+
 async function main() {
   /** @type {HTMLCanvasElement} */
   const canvas = document.querySelector("#canvas");
@@ -42,42 +57,60 @@ async function main() {
   if (!gl) { return; }
 
   twgl.setAttributePrefix("a_");
-  const birdProgramInfo = twgl.createProgramInfo(gl, [vs, fs]);
+  const shipProgramInfo = twgl.createProgramInfo(gl, [vs, fs]);
 
   const loader = new objLoader(gl, twgl);
-  var penguinModel = await loader.loadObjMtl("penguin", birdProgramInfo);
+  let shipModel = await loader.loadObjMtl("SpaceShip", shipProgramInfo);
+  let baseBounds = shipModel.bounds;
+  const sHeight = 125;
+  let allModels = [m4.translation(100, sHeight, randomZ()),
+                   m4.translation(150, sHeight, randomZ()),
+                   m4.translation(200, sHeight, randomZ()),
+                   m4.translation(250, sHeight, randomZ()),
+                   m4.translation(300, sHeight, randomZ()),
+                   m4.translation(50, sHeight, randomZ()),
+                   m4.translation(0, sHeight, randomZ()),
+                   m4.translation(-50, sHeight, randomZ()),
+                   m4.translation(-100, sHeight, randomZ()),
+                   m4.translation(-150, sHeight, randomZ()),
+                   m4.translation(-200, sHeight, randomZ()),
+                   m4.translation(-250, sHeight, randomZ()),
+                   m4.translation(-300, sHeight, randomZ()),
+  ];
 
-  penguinModel.bounds.minX = penguinModel.bounds.minX * 10 + 100;
-  penguinModel.bounds.maxX = penguinModel.bounds.maxX * 10 + 100;
-  penguinModel.bounds.minY = penguinModel.bounds.minY * 10 + 100;
-  penguinModel.bounds.maxY = penguinModel.bounds.maxY * 10 + 100;
-  penguinModel.bounds.minZ = penguinModel.bounds.minZ * 10;
-  penguinModel.bounds.maxZ = penguinModel.bounds.maxZ * 10;
+  /* let pointA = [-328.711, sHeight, 359.422]
+  let pointB = [345.363, sHeight, 289.319]
+  let pointC = [357.945, sHeight, -104.34]
+  let pointD = [23.605, sHeight, -287.688]
+  let pointE = [-328.711, sHeight, 359.422]
 
-  penguinModel.worldMatrix = m4.translation(100, 100, 0);
-  penguinModel.worldMatrix = m4.scale(penguinModel.worldMatrix, 10, 10, 10);
+  let pointC1 = [144.039, sHeight, 460.084]
+  let pointC2 = [406.479, sHeight, 373.802]
+  let pointC3 = [314.805, sHeight, 247.077]
+  let pointC4 = [218.637, sHeight, 226.405]
+  let pointC5 = [427.6, sHeight, -269.713]
+  let pointC6 = [521.296, sHeight, -429.918]
+  let pointC7 = [-225.24, sHeight, -216.573]
+  let pointC8 = [-497.51, sHeight, -105.407] */
 
-  let allModels = [penguinModel];
-  const zNear = 10;
-  const zFar = 2000;
+  let pointA = [-329.055, sHeight, 359.063];
+  let pointB = [162.082, sHeight, 108.648];
+  let pointC = [158.85, sHeight, -57.757];
+  let pointD = [-33.403, sHeight, -216.084];
+  let pointE = [-329.055, sHeight, 359.063];
 
-  let pointA = [0, 100, 0];
-  let pointB = [0, 0, 0];
-  let pointC = [3.6632, 10, 35.0648];
-  let pointD = [28.481, 10, 26.6826];
-  let pointE = [38.0137, 10, 37.037];
+  let pointC1 = [0, sHeight, 30];
+  let pointC2 = [242.861, sHeight, 140.959];
+  let pointC3 = [121.692, sHeight, 92.492];
+  let pointC4 = [20.587, sHeight, 116.096];
+  let pointC5 = [227.982, sHeight, -144.684];
+  let pointC6 = [322.39, sHeight, -237.511];
+  let pointC7 = [-211.3, sHeight, -205.37];
+  let pointC8 = [-412.8, sHeight, -175.37];
 
-  let pointC1 = [0, 100, 0];
-  let pointC2 = [-3.7328, 10, 59.3896];
-  let pointC3 = [6.868, 10, 48.048];
-  let pointC4 = [17.962, 10, 43.364];
-  let pointC5 = [-3.486, 10, 30.914];
-  let pointC6 = [-13.409, 10, 27.935];
-  let pointC7 = [49.426, 10, 26.056];
-  let pointC8 = [72.852, 10, 26.174];
 
-  let cameraPosition = [0, 100, 0];
-  let cameraTarget = [10, 100, 0];
+  let cameraPosition = v3.copy(pointA);
+  let cameraTarget = v3.copy(pointB);
 
   let curves = [(t) => bezierCurve(pointA, pointB, pointC1, pointC2, t, 0),
                 (t) => bezierCurve(pointB, pointC, pointC3, pointC4, t, 1),
@@ -91,13 +124,13 @@ async function main() {
 
   let controls = new function() {
     this.t = 0;
-    this.animationDuration = 10;
-    this.lightx = -10;
+    this.animationDuration = 30;
+    this.lightx = 2;
     this.lighty = 3;
-    this.lightz = -10;
-    this.cameraX = 0;
-    this.cameraY = 100;
-    this.cameraZ = 0;
+    this.lightz = 1;
+    this.cameraX = pointA[0];
+    this.cameraY = pointA[1];
+    this.cameraZ = pointA[2];
     this.kc = 0.25;
     this.kl = 0.0001;
     this.kq = 0.00005;
@@ -150,17 +183,6 @@ async function main() {
   const radius = 5;
   let ballBufferInfo = twgl.primitives.createSphereBufferInfo(gl, radius, 64, 64);
 
-  function createBallObj(worldMatrix, direction) {
-    if(!worldMatrix) {
-      worldMatrix = [0, 0, 0];
-      direction = [0, 0, 0]
-    }
-    return {
-      worldMatrix: m4.translation(...worldMatrix),
-      direction: m4.normalize(subtractVector2(direction, worldMatrix))
-    }
-  }
-
   let balls = [
     createBallObj(null, null),
     createBallObj(null, null),
@@ -200,47 +222,37 @@ async function main() {
     }
   }
 
-  const terrainBufferInfo = twgl.primitives.createPlaneBufferInfo(
-    gl,
-    960,  // width
-    960,  // height
-    240,  // quads across
-    240,  // quads down
-  );
-  
   const planeBufferInfo = twgl.primitives.createPlaneBufferInfo(gl, 5000, 5000, 1, 1);
   const quadBufferInfo = twgl.primitives.createXYQuadBufferInfo(gl); 
   
-
   const heightMapTexture = twgl.createTexture(gl, {
-    src: './models/ridge-height.png',
+    src: './models/ridge-height.png'
   });
 
   const groundTexture = twgl.createTexture(gl, {
-    src: './models/ridge.png',
+    src: './models/ridge.png'
   });
 
   const skyboxTexture = twgl.createTexture(gl, {
     target: gl.TEXTURE_CUBE_MAP,
     src: [
-      "./models/Box_Right.bmp",
-      "./models/Box_Left.bmp",
-      "./models/Box_Top.bmp",
-      "./models/Box_Bottom.bmp",
-      "./models/Box_Front.bmp",
-      "./models/Box_Back.bmp",
+      "./models/Textures/Skybox/Box_Right.bmp",
+      "./models/Textures/Skybox/Box_Left.bmp",
+      "./models/Textures/Skybox/Box_Top.bmp",
+      "./models/Textures/Skybox/Box_Bottom.bmp",
+      "./models/Textures/Skybox/Box_Front.bmp",
+      "./models/Textures/Skybox/Box_Back.bmp",
     ],
     min: gl.LINEAR_MIPMAP_LINEAR
   });
   
-  // get image data
+  // PRECOMPUTE NORMALS
   const img = await loadImage("./models/ridge-height.png");
-  const ctx = document.createElement('canvas').getContext('2d');
+  const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
   ctx.canvas.width = img.width;
   ctx.canvas.height = img.height;
   ctx.drawImage(img, 0, 0);
   const imgData = ctx.getImageData(0, 0, img.width, img.height);
-  const v3 = twgl.v3;
   const displacementScale = 200;
 
   const terrainVertices = twgl.primitives.createPlaneVertices(960, 960, 240, 240);
@@ -249,34 +261,30 @@ async function main() {
   let vertices = [];
   let texcoords = [];
   let indicesNormals = [];
+
   for(let i = 0; i < terrainVertices.texcoord.length; i += 2) {
     texcoords.push([terrainVertices.texcoord[i], terrainVertices.texcoord[i + 1]]);
   }
   for(let i = 0; i < terrainVertices.indices.length; i += 3) {
     triangles.push([terrainVertices.indices[i], terrainVertices.indices[i + 1], terrainVertices.indices[i + 2]]);
   }
-  let sendV = [];
   for(let i = 0; i < terrainVertices.position.length; i += 3) {
     let vertexPosition = [terrainVertices.position[i], terrainVertices.position[i + 1], terrainVertices.position[i + 2]];
     vertices.push(vertexPosition);
   }
 
   for(let i = 0; i < vertices.length; i++) {
-    let imgPos = [Math.round(texcoords[i][0] * imgData.width), Math.round(texcoords[i][1] * imgData.height)];
-    if(imgPos[0] >= imgData.width) imgPos[0] = imgData.width - 1;
-    if(imgPos[1] >= imgData.height) imgPos[1] = imgData.height - 1;
-    let height = imgData.data[(imgPos[0] * imgData.width + imgPos[1]) * 4] * displacementScale / 255;
+    let x = Math.floor(vertices[i][0] + imgData.width / 2);
+    let z = Math.floor(vertices[i][2] + imgData.height / 2);
+    let imageData = ctx.getImageData(x, z, 1, 1).data;
+    let red = imageData[0]; 
+    let height = red * displacementScale / 255;
     vertices[i][1] = height;
     indicesNormals.push({
       normal: v3.create(0, 0, 0),
       count: 0
     });
   }
-
-  for(let i = 0; i < vertices.length; i++) {
-    sendV.push(...vertices[i]);
-  }
-
 
   for(let i = 0; i < triangles.length; i++) {
     let v0 = vertices[triangles[i][0]];
@@ -287,7 +295,7 @@ async function main() {
     let normal = v3.normalize(v3.cross(v01, v02));
     normals.push(normal);
   }
-  console.log(triangles.length);
+
   for(let i = 0; i < triangles.length; i++) {
     indicesNormals[triangles[i][0]].normal = v3.add(normals[i], indicesNormals[triangles[i][0]].normal);
     indicesNormals[triangles[i][1]].normal = v3.add(normals[i], indicesNormals[triangles[i][1]].normal);
@@ -308,42 +316,40 @@ async function main() {
     }
     averagedNormals.push(...v3.normalize(average));
   }
+  // END PRECOMPUTE NORMALS 
 
-  console.log(averagedNormals.length);
-  console.log(terrainVertices.normal.length);
-
-  console.log(sendV.length);
-  let terrainBufferInfo2 = twgl.createBufferInfoFromArrays(gl, {
+  let terrainBufferInfo = twgl.createBufferInfoFromArrays(gl, {
     position: terrainVertices.position,
     normal: averagedNormals,
     texcoord: terrainVertices.texcoord,
     indices: terrainVertices.indices
   });
-  /* terrainBufferInfo.attribs.a_normal = terrainBufferInfo2.attribs.a_normal;
-  console.log(terrainBufferInfo);
-  console.log(terrainBufferInfo2); */
+
   let terrain_worldMatrix = m4.identity();
 
   function drawTerrain(sharedUniforms) {
     gl.useProgram(terrainProgramInfo.program);
-    twgl.setBuffersAndAttributes(gl, terrainProgramInfo, terrainBufferInfo2);
+    twgl.setBuffersAndAttributes(gl, terrainProgramInfo, terrainBufferInfo);
     twgl.setUniforms(terrainProgramInfo, sharedUniforms);
     twgl.setUniformsAndBindTextures(terrainProgramInfo, {
       u_world : terrain_worldMatrix,
       displacementMap: heightMapTexture,
       groundTexture : groundTexture,
     });
-    twgl.drawBufferInfo(gl, terrainBufferInfo2);
+    twgl.drawBufferInfo(gl, terrainBufferInfo);
 
-    /* gl.useProgram(planeProgramInfo.program);
+    gl.useProgram(planeProgramInfo.program);
     twgl.setBuffersAndAttributes(gl, planeProgramInfo, planeBufferInfo);
     twgl.setUniforms(planeProgramInfo, sharedUniforms);
     twgl.setUniformsAndBindTextures(planeProgramInfo, {
       u_world : terrain_worldMatrix,
       groundTexture : groundTexture
     });
-    twgl.drawBufferInfo(gl, planeBufferInfo); */
+    twgl.drawBufferInfo(gl, planeBufferInfo);
   }
+  
+  const zNear = 10;
+  const zFar = 2000;
 
   function render(time) {
     time *= 0.001;  // convert to seconds
@@ -363,11 +369,20 @@ async function main() {
     let curveNum = Math.floor(controls.t);
     if(curveNum >= numCurves) curveNum = numCurves - 1;
 
-    //let cameraPosition = [0, 100, 100];
-    cameraPosition = [controls.cameraX, controls.cameraY, controls.cameraZ];
-    //cameraTarget = [-299, 100, 300];
-    //let cameraTarget = [ballWorldMatrix[12], ballWorldMatrix[13], ballWorldMatrix[14]];
-    //let cameraTarget = balls[0].slice(12, 15);
+    if(playing) {
+      cameraPosition = curves[curveNum](controls.t);
+      cameraTarget = curves[curveNum](controls.t + 0.01);
+    } else {
+      cameraPosition = [controls.cameraX, controls.cameraY, controls.cameraZ];
+    }
+
+
+    for(let m in allModels) {
+      allModels[m] = m4.translate(allModels[m], 0, 0, 15 * deltaTime);	
+      if(allModels[m][14] > 500) {
+        allModels[m][14] = -500;
+      }
+    }
 
     for(let i = 0; i < activeBalls; i++) {
       let speed = 300;
@@ -376,10 +391,18 @@ async function main() {
 
       let [ballX, ballY, ballZ] = balls[i].worldMatrix.slice(12, 15);
       for(let m in allModels) {
-        let model = allModels[m];
-        const x = Math.max(model.bounds.minX, Math.min(ballX, model.bounds.maxX));
-        const y = Math.max(model.bounds.minY, Math.min(ballY, model.bounds.maxY));
-        const z = Math.max(model.bounds.minZ, Math.min(ballZ, model.bounds.maxZ));
+        let [modelX, modelY, modelZ] = allModels[m].slice(12, 15);
+        let modelBound = {
+          minX: baseBounds.minX + modelX,
+          minY: baseBounds.minY + modelY,
+          minZ: baseBounds.minZ + modelZ,
+          maxX: baseBounds.maxX + modelX,
+          maxY: baseBounds.maxY + modelY,
+          maxZ: baseBounds.maxZ + modelZ,
+        }; 
+        const x = Math.max(modelBound.minX, Math.min(ballX, modelBound.maxX));
+        const y = Math.max(modelBound.minY, Math.min(ballY, modelBound.maxY));
+        const z = Math.max(modelBound.minZ, Math.min(ballZ, modelBound.maxZ));
         const distance = Math.sqrt(
           (x - ballX) * (x - ballX) +
           (y - ballY) * (y - ballY) +
@@ -392,8 +415,6 @@ async function main() {
         }
       }
     }
-    /* let cameraPosition = curves[curveNum](controls.t);
-    let cameraTarget = curves[curveNum](controls.t + 0.01); */
     
     twgl.resizeCanvasToDisplaySize(gl.canvas);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -408,10 +429,7 @@ async function main() {
     const projection = m4.perspective(fieldOfViewRadians, aspect, zNear, zFar);
 
     const up = [0, 1, 0];
-    // Compute the camera's matrix using look at.
     const camera = m4.lookAt(cameraPosition, cameraTarget, up);
-
-    // Make a view matrix from the camera matrix.
     const view = m4.inverse(camera);
 
     let u_lightPositionArray = [];
@@ -434,20 +452,15 @@ async function main() {
     drawBalls(sharedUniforms);
     drawTerrain(sharedUniforms);
 
-    gl.useProgram(birdProgramInfo.program);
-    twgl.setUniforms(birdProgramInfo, sharedUniforms);
-    
+    gl.useProgram(shipProgramInfo.program);
+    twgl.setUniforms(shipProgramInfo, sharedUniforms);
+
     allModels.forEach(model => {
-      for (const {bufferInfo, vao, material} of model) {
-        twgl.setBuffersAndAttributes(gl, birdProgramInfo, bufferInfo);
-        let u_world = model.worldMatrix;
-        // set the attributes for this part.
-        //gl.bindVertexArray(vao);
-        // calls gl.uniform
-        twgl.setUniforms(birdProgramInfo, {
-          u_world,
+      for (const {bufferInfo, vao, material} of shipModel) {
+        twgl.setBuffersAndAttributes(gl, shipProgramInfo, bufferInfo);
+        twgl.setUniforms(shipProgramInfo, {
+          u_world: model,
         }, material);
-        // calls gl.drawArrays or gl.drawElements
         twgl.drawBufferInfo(gl, bufferInfo);
       }
     });

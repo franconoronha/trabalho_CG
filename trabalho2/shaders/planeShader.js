@@ -18,7 +18,8 @@ out vec2 v_texcoord;
 out vec3 v_surfaceToLightArray[5];
 
 void main() {
-  gl_Position =  u_projection * u_view * a_position;
+  vec4 position = a_position + vec4(0, 15, 0, 0);
+  gl_Position =  u_projection * u_view * position;
   v_normal = a_normal;
   v_texcoord = a_texcoord;
 
